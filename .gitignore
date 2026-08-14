@@ -8,3 +8,10 @@ wheels/
 
 # Virtual environments
 .venv
+
+
+# Personal notes, not for the repo
+notes/
+TODO.md
+notes.md
+
