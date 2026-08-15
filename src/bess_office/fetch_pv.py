@@ -13,7 +13,8 @@ def get_pv_profile(
     longitude: float,
     peak_power_kw: float,
     tilt: float = 35,
-    azimuth: float = 0,
+    azimuth: float = 180,  # pvlib convention: north=0, south=180
+    mounting_place: str = "building",  # "building" = dakpanelen, no aircirculation  
     save_raw: bool = True,
 ) -> pd.Series:
     """
@@ -28,9 +29,14 @@ def get_pv_profile(
     tilt : float
         Panel tilt angle in degrees (0 = flat, 90 = vertical).
     azimuth : float
-        Panel orientation in degrees, PVGIS convention:
-        0 = south, negative = east, positive = west.
-        (Internally converted to pvlib's own convention.)
+        Panel orientation in degrees, pvlib convention:
+        north=0, south=180 (clockwise).
+    mounting_place : str
+        "building" (default) = panels mounted flush on a roof, no
+        airflow behind them → higher module temperature, lower yield.
+        "free" = panels on a rack with airflow behind them → cooler,
+        higher yield. Use "building" for a typical office rooftop
+        installation; use "free" for a ground-mount system.
     save_raw : bool
         If True, saves the raw response to data/raw/.
 
@@ -39,10 +45,6 @@ def get_pv_profile(
     pd.Series
         Hourly PV power output in W, indexed by timestamp.
     """
-    # pvlib gebruikt een andere azimuth-conventie dan PVGIS zelf:
-    # pvlib: noord=0, zuid=180 (kloksgewijs). PVGIS: zuid=0.
-    azimuth_pvlib = azimuth + 180
-
     data, meta = get_pvgis_hourly(
         latitude=latitude,
         longitude=longitude,
@@ -50,7 +52,8 @@ def get_pv_profile(
         peakpower=peak_power_kw,
         loss=14,
         surface_tilt=tilt,
-        surface_azimuth=azimuth_pvlib,
+        surface_azimuth=azimuth,
+        mountingplace=mounting_place,
     )
 
     if save_raw:
