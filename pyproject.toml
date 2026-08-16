@@ -13,3 +13,9 @@ dependencies = [
     "pyomo>=6.10.1",
     "requests>=2.34.2",
 ]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.3.0",
+    "nbstripout>=0.9.1",
+]
