@@ -6,8 +6,8 @@ from pathlib import Path
 import pandas as pd
 from entsoe import EntsoePandasClient
 
-# Paths relative to the project root (assumes this runs from main.py at the root)
-RAW_DATA_DIR = Path("data/raw")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+RAW_DATA_DIR = PROJECT_ROOT / "data" / "raw"
 
 
 def get_day_ahead_prices(
