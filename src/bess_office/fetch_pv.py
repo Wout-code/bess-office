@@ -5,7 +5,8 @@ from pathlib import Path
 import pandas as pd
 from pvlib.iotools import get_pvgis_hourly
 
-RAW_DATA_DIR = Path("data/raw")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent  # src/bess_office/ -> src/ -> project root
+RAW_DATA_DIR = PROJECT_ROOT / "data" / "raw"
 
 
 def get_pv_profile( #the vvariables defined here can change
