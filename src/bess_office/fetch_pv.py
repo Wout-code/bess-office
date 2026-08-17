@@ -15,6 +15,7 @@ def get_pv_profile(
     tilt: float = 35,
     azimuth: float = 180,  # pvlib convention: north=0, south=180
     mounting_place: str = "building",  # "building" = dakpanelen, no aircirculation  
+    year: int = 2023,
     save_raw: bool = True,
 ) -> pd.Series:
     """
