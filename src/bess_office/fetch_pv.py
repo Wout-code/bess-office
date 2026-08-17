@@ -8,7 +8,7 @@ from pvlib.iotools import get_pvgis_hourly
 RAW_DATA_DIR = Path("data/raw")
 
 
-def get_pv_profile(
+def get_pv_profile( #the vvariables defined here can change
     latitude: float,
     longitude: float,
     peak_power_kw: float,
@@ -50,6 +50,8 @@ def get_pv_profile(
         latitude=latitude,
         longitude=longitude,
         pvcalculation=True,
+        start=year,
+        end=year,
         peakpower=peak_power_kw,
         loss=14,
         surface_tilt=tilt,
@@ -66,7 +68,7 @@ def get_pv_profile(
     return data["P"]
 
 
-if __name__ == "__main__":
+if __name__ == "__main__": #the variables defind here are permanent
     pv = get_pv_profile(latitude=52.01, longitude=4.36, peak_power_kw=10)
     print(pv.head())
     print(f"\nAvailable columns: {list(pv.to_frame().columns) if hasattr(pv, 'to_frame') else 'N/A'}")

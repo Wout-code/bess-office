@@ -19,3 +19,7 @@ dev = [
     "ipykernel>=7.3.0",
     "nbstripout>=0.9.1",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
