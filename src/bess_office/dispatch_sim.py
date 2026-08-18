@@ -41,6 +41,7 @@ def run_baseline_dispatch(
     load_kwh: pd.Series,
     battery: BatterySpec,
     peak_threshold_kw: float,
+    timestep_hours: float = 1.0,
 ) -> pd.DataFrame:
     """
     Simulate hourly battery dispatch using simple priority rules.
