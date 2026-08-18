@@ -66,7 +66,11 @@ def get_pv_profile( #the vvariables defined here can change
         data.to_csv(raw_path)
         print(f"Saved raw PVGIS response to {raw_path}")
 
-    return data["P"]
+    series = data["P"]
+    series.index = series.index.tz_localize(None).round("h")
+    return series
+
+
 
 
 if __name__ == "__main__": #the variables defind here are permanent
