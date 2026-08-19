@@ -1,5 +1,6 @@
 """Fetch PV generation profile from PVGIS, via pvlib."""
 
+from functools import lru_cache
 from pathlib import Path
 
 import pandas as pd
@@ -9,18 +10,25 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent  # src/bess_office/
 RAW_DATA_DIR = PROJECT_ROOT / "data" / "raw"
 
 
-def get_pv_profile( #the vvariables defined here can change
+@lru_cache(maxsize=32)
+def get_pv_profile(  # the variables defined here can change
     latitude: float,
     longitude: float,
     peak_power_kw: float,
     tilt: float = 35,
     azimuth: float = 180,  # pvlib convention: north=0, south=180
-    mounting_place: str = "building",  # "building" = dakpanelen, no aircirculation  
+    mounting_place: str = "building",  # "building" = dakpanelen, no aircirculation
     year: int = 2023,
     save_raw: bool = True,
 ) -> pd.Series:
     """
     Fetch an hourly PV generation profile from PVGIS via pvlib.
+
+    Cached with lru_cache: repeated calls with the exact same
+    arguments return the stored result instantly instead of hitting
+    the PVGIS API again. This is safe because PV yield for a fixed
+    location/orientation/year is deterministic -- the same inputs
+    always produce the same output, unlike e.g. live price data.
 
     Parameters
     ----------
@@ -71,9 +79,7 @@ def get_pv_profile( #the vvariables defined here can change
     return series
 
 
-
-
-if __name__ == "__main__": #the variables defind here are permanent
+if __name__ == "__main__":  # the variables defined here are permanent
     pv = get_pv_profile(latitude=52.01, longitude=4.36, peak_power_kw=10)
     print(pv.head())
     print(f"\nAvailable columns: {list(pv.to_frame().columns) if hasattr(pv, 'to_frame') else 'N/A'}")
