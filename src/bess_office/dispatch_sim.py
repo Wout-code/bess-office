@@ -134,10 +134,9 @@ def run_baseline_dispatch(
 def compute_dispatch_metrics(result: pd.DataFrame, peak_threshold_kw: float) -> dict:
     """
     Compute summary metrics for a dispatch result: peak shaving and
-    self-consumption, each compared against a no-battery baseline.
-    Works on the output of run_baseline_dispatch() or any other
-    dispatch strategy with the same column layout, so it can be
-    reused to compare the LP optimization against this baseline.
+    self-consumption. Works on the output of run_baseline_dispatch()
+    or any other dispatch strategy with the same column layout, so it
+    can be reused to compare the LP optimization against this baseline.
 
     Parameters
     ----------
@@ -153,9 +152,7 @@ def compute_dispatch_metrics(result: pd.DataFrame, peak_threshold_kw: float) -> 
     -------
     dict
         peak_import_no_battery_kw, peak_import_with_battery_kw,
-        peak_shaved_kw, peak_shaved_pct,
-        self_consumption_no_battery_pct, self_consumption_pct,
-        self_consumption_gain_pct.
+        peak_shaved_kw, peak_shaved_pct, self_consumption_pct.
     """
     # Peak shaving: compare against the "naive" import that would have
     # happened with no battery at all (grid covering the full deficit).
@@ -165,18 +162,9 @@ def compute_dispatch_metrics(result: pd.DataFrame, peak_threshold_kw: float) -> 
     peak_shaved = peak_no_battery - peak_with_battery
     peak_shaved_pct = 100 * peak_shaved / peak_no_battery if peak_no_battery > 0 else 0.0
 
-    # Self-consumption WITHOUT a battery: any PV surplus not consumed
-    # in that same timestep is exported immediately, no buffering.
-    naive_export = (result["pv_kwh"] - result["load_kwh"]).clip(lower=0)
+    # Self-consumption: share of PV generation that did NOT leave the
+    # building as grid export (used directly, or via the battery).
     pv_total = result["pv_kwh"].sum()
-    pv_used_onsite_no_battery = pv_total - naive_export.sum()
-    self_consumption_no_battery_pct = (
-        100 * pv_used_onsite_no_battery / pv_total if pv_total > 0 else 0.0
-    )
-
-    # Self-consumption WITH the battery: share of PV generation that
-    # did NOT leave the building as grid export (used directly, or
-    # via the battery).
     pv_exported = result["grid_export_kwh"].sum()
     pv_used_onsite = pv_total - pv_exported
     self_consumption_pct = 100 * pv_used_onsite / pv_total if pv_total > 0 else 0.0
@@ -187,9 +175,7 @@ def compute_dispatch_metrics(result: pd.DataFrame, peak_threshold_kw: float) -> 
         "peak_import_with_battery_kw": peak_with_battery,
         "peak_shaved_kw": peak_shaved,
         "peak_shaved_pct": peak_shaved_pct,
-        "self_consumption_no_battery_pct": self_consumption_no_battery_pct,
         "self_consumption_pct": self_consumption_pct,
-        "self_consumption_gain_pct": self_consumption_pct - self_consumption_no_battery_pct,
     }
 
 
@@ -220,9 +206,6 @@ if __name__ == "__main__":
     print(f"\nPeak without battery: {metrics['peak_import_no_battery_kw']:.2f} kW")
     print(f"Peak with battery:    {metrics['peak_import_with_battery_kw']:.2f} kW")
     print(f"Peak shaved:          {metrics['peak_shaved_kw']:.2f} kW ({metrics['peak_shaved_pct']:.0f}%)")
-    print()
-    print(f"Self-consumption (no battery):   {metrics['self_consumption_no_battery_pct']:.0f}%")
-    print(f"Self-consumption (with battery): {metrics['self_consumption_pct']:.0f}%")
-    print(f"Self-consumption gain:           +{metrics['self_consumption_gain_pct']:.0f} pp")
+    print(f"Self-consumption:     {metrics['self_consumption_pct']:.0f}%")
     print(f"\nTotal grid import: {result['grid_import_kwh'].sum():.2f} kWh")
     print(f"Total grid export: {result['grid_export_kwh'].sum():.2f} kWh")
