@@ -1,76 +1,48 @@
 """Fetch PV generation profile from PVGIS, via pvlib."""
 
-from functools import lru_cache
-from pathlib import Path
-
 import pandas as pd
 from pvlib.iotools import get_pvgis_hourly
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent  # src/bess_office/ -> src/ -> project root
-RAW_DATA_DIR = PROJECT_ROOT / "data" / "raw"
+from bess_office.config import CONFIG, PVConfig
 
 
-@lru_cache(maxsize=32)
-def get_pv_profile(  # the variables defined here can change
-    latitude: float,
-    longitude: float,
-    peak_power_kw: float,
-    tilt: float = 35,
-    azimuth: float = 180,  # pvlib convention: north=0, south=180
-    mounting_place: str = "building",  # "building" = dakpanelen, no aircirculation
-    year: int = 2023,
-    save_raw: bool = True,
-) -> pd.Series:
+def get_pv_profile(pv_config: PVConfig | None = None) -> pd.Series:
     """
     Fetch an hourly PV generation profile from PVGIS via pvlib.
 
-    Cached with lru_cache: repeated calls with the exact same
-    arguments return the stored result instantly instead of hitting
-    the PVGIS API again. This is safe because PV yield for a fixed
-    location/orientation/year is deterministic -- the same inputs
-    always produce the same output, unlike e.g. live price data.
-
     Parameters
     ----------
-    latitude, longitude : float
-        Location of the installation.
-    peak_power_kw : float
-        Installed peak power in kWp.
-    tilt : float
-        Panel tilt angle in degrees (0 = flat, 90 = vertical).
-    azimuth : float
-        Panel orientation in degrees, pvlib convention:
-        north=0, south=180 (clockwise).
-    mounting_place : str
-        "building" (default) = panels mounted flush on a roof, no
-        airflow behind them → higher module temperature, lower yield.
-        "free" = panels on a rack with airflow behind them → cooler,
-        higher yield. Use "building" for a typical office rooftop
-        installation; use "free" for a ground-mount system.
-    save_raw : bool
-        If True, saves the raw response to data/raw/.
+    pv_config : PVConfig, optional
+        PV installation settings. Defaults to CONFIG.pv if not given
+        -- read at call time, so it always reflects the current CONFIG,
+        not a stale snapshot from when this module was imported.
 
     Returns
     -------
     pd.Series
-        Hourly PV power output in W, indexed by timestamp.
+        Hourly PV power output in W, indexed by timestamp (tz-naive,
+        rounded to the hour to align cleanly with other hourly series).
     """
+    if pv_config is None:
+        pv_config = CONFIG.pv
+
     data, meta = get_pvgis_hourly(
-        latitude=latitude,
-        longitude=longitude,
+        latitude=pv_config.latitude,
+        longitude=pv_config.longitude,
         pvcalculation=True,
-        peakpower=peak_power_kw,
-        loss=14,
-        start=year,
-        end=year,
-        surface_tilt=tilt,
-        surface_azimuth=azimuth,
-        mountingplace=mounting_place,
+        peakpower=pv_config.peak_power_kw,
+        loss=pv_config.system_loss_pct,
+        start=pv_config.year,
+        end=pv_config.year,
+        surface_tilt=pv_config.tilt,
+        surface_azimuth=pv_config.azimuth,
+        mountingplace=pv_config.mounting_place,
     )
 
-    if save_raw:
-        RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
-        raw_path = RAW_DATA_DIR / f"pvgis_{latitude}_{longitude}.csv"
+    if pv_config.save_raw:
+        raw_dir = CONFIG.data_dir / "raw"
+        raw_dir.mkdir(parents=True, exist_ok=True)
+        raw_path = raw_dir / f"pvgis_{pv_config.latitude}_{pv_config.longitude}.csv"
         data.to_csv(raw_path)
         print(f"Saved raw PVGIS response to {raw_path}")
 
@@ -79,9 +51,8 @@ def get_pv_profile(  # the variables defined here can change
     return series
 
 
-if __name__ == "__main__":  # the variables defined here are permanent
-    pv = get_pv_profile(latitude=52.01, longitude=4.36, peak_power_kw=10)
+if __name__ == "__main__":
+    pv = get_pv_profile()  # gebruikt gewoon CONFIG.pv
     print(pv.head())
-    print(f"\nAvailable columns: {list(pv.to_frame().columns) if hasattr(pv, 'to_frame') else 'N/A'}")
-    print(f"Total rows: {len(pv)}")
+    print(f"\nTotal rows: {len(pv)}")
     print(f"Total annual yield: {pv.sum() / 1000:.0f} kWh")

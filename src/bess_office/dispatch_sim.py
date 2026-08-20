@@ -19,27 +19,15 @@ applied on charge only (discharge assumed lossless on the way out --
 a common simplification), SoC bounded between configurable min/max.
 """
 
-from dataclasses import dataclass
-
 import pandas as pd
 
-
-@dataclass
-class BatterySpec:  # fake battery specs, need to replace with real ones
-    """Physical specification of the battery."""
-
-    capacity_kwh: float
-    power_kw: float
-    round_trip_efficiency: float = 0.90
-    min_soc_fraction: float = 0.10
-    max_soc_fraction: float = 0.95
-    initial_soc_fraction: float = 0.50
+from bess_office.config import BatteryConfig
 
 
 def run_baseline_dispatch(
     pv_kwh: pd.Series,
     load_kwh: pd.Series,
-    battery: BatterySpec,
+    battery: BatteryConfig,
     peak_threshold_kw: float,
     timestep_hours: float = 1.0,
 ) -> pd.DataFrame:
@@ -54,7 +42,7 @@ def run_baseline_dispatch(
         Building consumption in kWh per timestep, same index as pv_kwh.
         Resample/align both series to the same index before calling
         this (e.g. load_kwh.resample("1h").sum()).
-    battery : BatterySpec
+    battery : BatteryConfig
         Battery capacity, power, efficiency and SoC bounds.
     peak_threshold_kw : float
         Grid import above this level triggers battery discharge for
@@ -132,42 +120,23 @@ def run_baseline_dispatch(
 
 
 def compute_dispatch_metrics(result: pd.DataFrame, peak_threshold_kw: float) -> dict:
-    """
-    Compute summary metrics for a dispatch result: peak shaving and
-    self-consumption. Works on the output of run_baseline_dispatch()
-    or any other dispatch strategy with the same column layout, so it
-    can be reused to compare the LP optimization against this baseline.
-
-    Parameters
-    ----------
-    result : pd.DataFrame
-        Output of run_baseline_dispatch() (or equivalent), with at
-        least pv_kwh, load_kwh, grid_import_kwh, grid_export_kwh
-        columns.
-    peak_threshold_kw : float
-        The threshold used during dispatch, only reported here for
-        context alongside the metrics.
-
-    Returns
-    -------
-    dict
-        peak_import_no_battery_kw, peak_import_with_battery_kw,
-        peak_shaved_kw, peak_shaved_pct, self_consumption_pct.
-    """
-    # Peak shaving: compare against the "naive" import that would have
-    # happened with no battery at all (grid covering the full deficit).
+    """... (docstring ongewijzigd, alleen Returns-sectie uitbreiden) ..."""
     naive_import = (result["load_kwh"] - result["pv_kwh"]).clip(lower=0)
     peak_no_battery = naive_import.max()
     peak_with_battery = result["grid_import_kwh"].max()
     peak_shaved = peak_no_battery - peak_with_battery
     peak_shaved_pct = 100 * peak_shaved / peak_no_battery if peak_no_battery > 0 else 0.0
 
-    # Self-consumption: share of PV generation that did NOT leave the
-    # building as grid export (used directly, or via the battery).
     pv_total = result["pv_kwh"].sum()
     pv_exported = result["grid_export_kwh"].sum()
     pv_used_onsite = pv_total - pv_exported
     self_consumption_pct = 100 * pv_used_onsite / pv_total if pv_total > 0 else 0.0
+
+    # Self-consumption WITHOUT a battery: PV used directly on-site,
+    # i.e. min(pv, load) at each timestep -- the battery isn't involved.
+    naive_pv_used_onsite = pd.concat([result["pv_kwh"], result["load_kwh"]], axis=1).min(axis=1).sum()
+    self_consumption_no_battery_pct = 100 * naive_pv_used_onsite / pv_total if pv_total > 0 else 0.0
+    self_consumption_gain_pct = self_consumption_pct - self_consumption_no_battery_pct
 
     return {
         "peak_threshold_kw": peak_threshold_kw,
@@ -176,6 +145,8 @@ def compute_dispatch_metrics(result: pd.DataFrame, peak_threshold_kw: float) -> 
         "peak_shaved_kw": peak_shaved,
         "peak_shaved_pct": peak_shaved_pct,
         "self_consumption_pct": self_consumption_pct,
+        "self_consumption_no_battery_pct": self_consumption_no_battery_pct,
+        "self_consumption_gain_pct": self_consumption_gain_pct,
     }
 
 
@@ -183,7 +154,7 @@ if __name__ == "__main__":
     # Isolated logic test with synthetic, perfectly-aligned data.
     # This checks the dispatch RULES, not real-world data integration
     # (timezones, resampling, index alignment) -- that's covered in
-    # notebooks/0.4-dispatch-exploration.ipynb.
+    # notebooks/1.0-dispatch-baseline-test.ipynb.
     import numpy as np
 
     hours = pd.date_range("2023-06-01", periods=24, freq="1h")
@@ -196,7 +167,7 @@ if __name__ == "__main__":
         index=hours,
     )
 
-    battery = BatterySpec(capacity_kwh=10, power_kw=5)
+    battery = BatteryConfig(capacity_kwh=10, power_kw=5)
     peak_threshold_kw = 4
     result = run_baseline_dispatch(pv, load, battery, peak_threshold_kw=peak_threshold_kw)
 

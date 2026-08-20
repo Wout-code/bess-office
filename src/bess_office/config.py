@@ -20,19 +20,20 @@ class PVConfig:
     tilt: float = 35.0
     azimuth: float = 180.0
     mounting_place: str = "building"
+    system_loss_pct: float = 14.0  
     year: int = 2023
     save_raw: bool = True
 
 
 @dataclass
 class BuildingConfig:
-    peak_kwh_per_quarter: float = 15.0  # Schaal van het kantoorverbruik
+    peak_kwh_per_quarter: float = 15.0  # Schaal van het verbruik
 
 
 @dataclass
 class SimConfig:
     """Settings shared by both dispatch_sim and optimize."""
-    timestep_hours: float = 0.25  # 15-minuten voor capaciteitstarief!
+    timestep_hours: float = 0.25  # 15-minuten voor capaciteitstarief
 
 
 @dataclass
