@@ -1,5 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+
 
 @dataclass
 class BatteryConfig:
@@ -9,6 +10,7 @@ class BatteryConfig:
     min_soc_fraction: float = 0.10
     max_soc_fraction: float = 0.95
     initial_soc_fraction: float = 0.50
+
 
 @dataclass
 class PVConfig:
@@ -21,23 +23,58 @@ class PVConfig:
     year: int = 2023
     save_raw: bool = True
 
+
 @dataclass
 class BuildingConfig:
-    peak_kwh_per_quarter: float = 15.0 # Schaal van het kantoorverbruik
+    peak_kwh_per_quarter: float = 15.0  # Schaal van het kantoorverbruik
+
 
 @dataclass
 class SimConfig:
-    timestep_hours: float = 0.25     # 15-minuten voor capaciteitstarief!
-    peak_threshold_kw: float = 20.0  #only relevant for dispatch
-    #peak_tariff: float = 5.0     Hier moet je nog naar kijken want dit is te versimpeld.
+    """Settings shared by both dispatch_sim and optimize."""
+    timestep_hours: float = 0.25  # 15-minuten voor capaciteitstarief!
+
 
 @dataclass
-class ProjectConfig:
-    battery: BatteryConfig = BatteryConfig()
-    pv: PVConfig = PVConfig()
-    building: BuildingConfig = BuildingConfig()
-    sim: SimConfig = SimConfig()
-    
-    data_dir: Path = Path(__file__).parent.parent.parent / "data"
+class DispatchConfig:
+    """Rule-based dispatch (dispatch_sim.py) specific settings."""
+    peak_threshold_kw: float = 20.0
+
+
+@dataclass
+class GridTariffConfig:
+    """
+    Netbeheerder-transportkosten, opgesplitst per component.
+    Structuur bevestigd (grootverbruik >3x80A): 3 aparte componenten.
+    TODO: alle waarden zijn nog placeholders (None) -- opzoeken bij een
+    echte netbeheerder-tarieventabel (Liander/Stedin/Enexis) voordat
+    optimize.py hiermee gaat rekenen. Tarieven verschillen per netbeheerder.
+    """
+    # 1. Transporttarief: over het totale jaarvolume, kWh -- geen piek-relatie
+    transport_tariff_eur_per_kwh: float | None = None
+
+    # 2. Gecontracteerd transportvermogen (GTV): vaste, gekozen grens (kW)
+    #    en de vaste prijs die je daarvoor betaalt, ongeacht werkelijk gebruik
+    contracted_capacity_kw: float | None = None
+    contracted_capacity_tariff_eur_per_kw: float | None = None
+
+    # 3. Boetetarief bij overschrijding van de gecontracteerde piek --
+    #    dit is de term die optimize.py's doelfunctie zal gebruiken
+    overshoot_penalty_eur_per_kw: float | None = None
+
+
+@dataclass
+class ProjectConfig:      
+    battery: BatteryConfig = field(default_factory=BatteryConfig)
+    pv: PVConfig = field(default_factory=PVConfig)
+    building: BuildingConfig = field(default_factory=BuildingConfig)
+    sim: SimConfig = field(default_factory=SimConfig)
+    dispatch: DispatchConfig = field(default_factory=DispatchConfig)
+    grid_tariff: GridTariffConfig = field(default_factory=GridTariffConfig)
+
+    data_dir: Path = field(
+        default_factory=lambda: Path(__file__).parent.parent.parent / "data"
+    )
+
 
 CONFIG = ProjectConfig()
