@@ -22,5 +22,11 @@ z.pythoncodedingenleren.md
 z.Roadmap.md
 dispatch_sim.md
 z.aanames.md
+z.Overdrachtsprompt.md
 # data
 data/
+
+
+# py files
+dump_context.py
+
