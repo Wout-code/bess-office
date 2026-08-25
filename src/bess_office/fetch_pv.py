@@ -26,28 +26,39 @@ def get_pv_profile(pv_config: PVConfig | None = None) -> pd.Series:
     if pv_config is None:
         pv_config = CONFIG.pv
 
-    data, meta = get_pvgis_hourly(
-        latitude=pv_config.latitude,
-        longitude=pv_config.longitude,
-        pvcalculation=True,
-        peakpower=pv_config.peak_power_kw,
-        loss=pv_config.system_loss_pct,
-        start=pv_config.year,
-        end=pv_config.year,
-        surface_tilt=pv_config.tilt,
-        surface_azimuth=pv_config.azimuth,
-        mountingplace=pv_config.mounting_place,
+    raw_dir = CONFIG.data_dir / "raw"
+    raw_path = (
+        raw_dir
+        / f"pvgis_{pv_config.latitude}_{pv_config.longitude}_{pv_config.year}.csv"
     )
 
-    if pv_config.save_raw:
-        raw_dir = CONFIG.data_dir / "raw"
-        raw_dir.mkdir(parents=True, exist_ok=True)
-        raw_path = raw_dir / f"pvgis_{pv_config.latitude}_{pv_config.longitude}.csv"
-        data.to_csv(raw_path)
-        print(f"Saved raw PVGIS response to {raw_path}")
+    if raw_path.exists():
+        print(f"Al lokaal aanwezig, laad van schijf: {raw_path}")
+        data = pd.read_csv(raw_path, index_col=0, parse_dates=True)
+    else:
+        data, meta = get_pvgis_hourly(
+            latitude=pv_config.latitude,
+            longitude=pv_config.longitude,
+            pvcalculation=True,
+            peakpower=pv_config.peak_power_kw,
+            loss=pv_config.system_loss_pct,
+            start=pv_config.year,
+            end=pv_config.year,
+            surface_tilt=pv_config.tilt,
+            surface_azimuth=pv_config.azimuth,
+            mountingplace=pv_config.mounting_place,
+        )
+
+        if pv_config.save_raw:
+            raw_dir.mkdir(parents=True, exist_ok=True)
+            data.to_csv(raw_path)
+            print(f"Saved raw PVGIS response to {raw_path}")
 
     series = data["P"]
-    series.index = series.index.tz_localize(None).round("h")
+    idx = pd.to_datetime(series.index)
+    if idx.tz is not None:
+        idx = idx.tz_localize(None)
+    series.index = idx.round("h")
     return series
 
 
