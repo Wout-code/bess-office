@@ -33,7 +33,9 @@ def get_day_ahead_prices(
     Returns
     -------
     pd.Series
-        Hourly day-ahead prices in EUR/MWh, indexed by timestamp.
+        Day-ahead prices in EUR/MWh, indexed by timestamp. Resolution
+        depends on the queried period: hourly before the SDAC 15-minute
+        MTU transition (1 October 2025), 15-minute (quarter-hour) after.
     """
     api_key = os.getenv("ENTSOE_API_KEY")
     if not api_key:
@@ -56,11 +58,11 @@ def get_day_ahead_prices(
 
 
 if __name__ == "__main__":
-    # Quick manual test: fetch the last 7 days
     tz = "Europe/Amsterdam"
-    end = pd.Timestamp.now(tz=tz).normalize()
-    start = end - pd.Timedelta(days=7)
+    start = pd.Timestamp("2023-01-01", tz=tz)
+    end = pd.Timestamp("2024-01-01", tz=tz)
 
     prices = get_day_ahead_prices(start, end)
     print(prices.head())
-    print(f"\nFetched {len(prices)} hourly prices.")
+    resolution = prices.index[1] - prices.index[0] if len(prices) > 1 else "onbekend"
+    print(f"\nFetched {len(prices)} prices at {resolution} resolution.")
