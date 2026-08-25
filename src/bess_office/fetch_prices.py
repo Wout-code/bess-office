@@ -6,6 +6,11 @@ from pathlib import Path
 import pandas as pd
 from entsoe import EntsoePandasClient
 
+#import socket
+
+#socket.setdefaulttimeout(30)  # seconden
+
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 RAW_DATA_DIR = PROJECT_ROOT / "data" / "raw"
 
@@ -16,6 +21,11 @@ def get_day_ahead_prices(
     country_code: str = "NL",
     save_raw: bool = True,
 ) -> pd.Series:
+    raw_path = RAW_DATA_DIR / f"entsoe_prices_{country_code}_{start.date()}_{end.date()}.csv"
+
+    if raw_path.exists():
+        print(f"Al lokaal aanwezig, laad van schijf: {raw_path}")
+        return pd.read_csv(raw_path, index_col=0, parse_dates=True)["price_eur_mwh"]
     """
     Fetch day-ahead electricity prices for a given period and country.
 
@@ -60,7 +70,7 @@ def get_day_ahead_prices(
 if __name__ == "__main__":
     tz = "Europe/Amsterdam"
     start = pd.Timestamp("2023-01-01", tz=tz)
-    end = pd.Timestamp("2024-01-01", tz=tz)
+    end = pd.Timestamp("2023-02-01", tz=tz)
 
     prices = get_day_ahead_prices(start, end)
     print(prices.head())
