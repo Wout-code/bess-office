@@ -14,7 +14,10 @@
 - Geen zelfontlading
 
 **Tijd**
-- Vaste tijdstap van 15 min
+- Vaste tijdstap van 1 uur; `load` naar 1h geresampled, wat een
+  kwartier-piek wegmiddelt — gerapporteerde pieken zijn vermoedelijk een
+  onderschatting van de piek die de factuur bepaalt
+- Geen vooruitkijken — puur reactief, elk uur op zichzelf
 
 **Markt/Net**
 - Eén vaste, statische peak-drempel voor het hele jaar
@@ -23,9 +26,17 @@
 
 **Architectuur**
 - Geen kosten/prijzen in het model zelf — puur een fysieke
-  energiestroom-simulatie, 
+  energiestroom-simulatie, financiële vertaling gebeurt elders
 - Batterij kan structureel nooit vanaf het net laden — alleen vanaf
   PV-overschot
+
+**PV**
+- PVGIS gebruikt standaard (`usehorizon=True`, geen `userhorizon`) een
+  terreinschaduw-model op basis van een hoogtekaart -- dat ziet natuurlijke
+  verhogingen (heuvels), maar geen gebouwen. Staat je kantoorpand op een
+  bedrijventerrein/binnenstedelijk met hogere buurpanden die vroeg/laat
+  schaduw werpen, dan onderschat PVGIS die verliezen structureel, zonder
+  waarschuwing in de output -- de PV-opbrengst is dan te hoog ingeschat.
 
 ---
 
@@ -58,6 +69,14 @@ van correcte fysica of betere parameters.
 
 **Architectuur**
 - Grid-charging wordt mogelijk
+
+**PV**
+- PVGIS gebruikt standaard (`usehorizon=True`, geen `userhorizon`) een
+  terreinschaduw-model op basis van een hoogtekaart -- dat ziet natuurlijke
+  verhogingen (heuvels), maar geen gebouwen. Staat je kantoorpand op een
+  bedrijventerrein/binnenstedelijk met hogere buurpanden die vroeg/laat
+  schaduw werpen, dan onderschat PVGIS die verliezen structureel, zonder
+  waarschuwing in de output -- de PV-opbrengst is dan te hoog ingeschat.
 
 ## dispatch_sim.py specifiek (blijft regelgebaseerd)
 

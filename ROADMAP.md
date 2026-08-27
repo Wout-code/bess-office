@@ -54,7 +54,7 @@ combinatie van piekvermogenkosten én energiekosten (day-ahead-prijzen).
 **Waarom dit de fase is waar LP zijn meerwaarde het duidelijkst toont:**
 een regelgebaseerde aanpak kan niet afwegen "ontladen voor de piek nu, of
 bewaren voor een duurder uur later" — dat vereist vooruitkijken over de hele
-periode tegelijk, precies wat een LP wél kan en een simpele regel niet.
+periode tegelijk, precies wat een LP wél kan en een simpele regel niet. Omdat de day-ahead prijzen voor elk kwartier bekend zijn na de veiling kan je optimaliseren. 
 
 **Optioneel binnen deze fase:**
 - Zelfconsumptie als derde term, met scenario "vóór 2027" vs. "ná 2027" —
