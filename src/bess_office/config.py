@@ -19,7 +19,7 @@ class PVConfig:
     peak_power_kw: float = 25.0  # o.b.v. jaarverbruik-vuistregel, zie BuildingConfig
     tilt: float = 12.0
     azimuth: float = 180.0
-    mounting_place: str = "building"
+    mounting_place: str = "free"
     system_loss_pct: float = 14.0
     year: int = 2023
     save_raw: bool = True
