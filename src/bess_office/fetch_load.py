@@ -37,7 +37,8 @@ def get_load_profile(peak_kwh_per_quarter: float) -> pd.Series:
     -------
     pd.Series
         Quarter-hourly electricity consumption in kWh, indexed by
-        timestamp.
+        timestamp (tz-aware, Europe/Amsterdam -- matches fetch_pv.py
+        and fetch_prices.py's convention).
     """
     if not LOAD_PROFILE_FILE.exists():
         raise FileNotFoundError(
@@ -49,6 +50,19 @@ def get_load_profile(peak_kwh_per_quarter: float) -> pd.Series:
     df = pd.read_csv(LOAD_PROFILE_FILE, sep=";")
     df["DATUM_TIJDSTIP"] = pd.to_datetime(df["DATUM_TIJDSTIP"])
     df = df.set_index("DATUM_TIJDSTIP")
+
+    # Genormaliseerd profiel (365x96, geen gaps -- zie docstring), dus
+    # geen echte klokwissel-onregelmatigheid in de brondata. tz_localize
+    # botst daar toch op: nonexistent (maart) schuiven we door,
+    # ambiguous (oktober) kiezen we bewust als zomertijd -- pragmatisch
+    # correct voor een genormaliseerd patroon, niet voor een echte meting.
+    df.index = df.index.tz_localize(
+        "Europe/Amsterdam", nonexistent="shift_forward", ambiguous=True
+    )
+    # shift_forward (maart) kan botsen met al bestaande rijen in dit
+    # uniforme 96-per-dag-profiel -- voor synthetische data is er geen
+    # "juiste" van de twee, dus expliciet dedupliceren i.p.v. laten gokken
+    df = df[~df.index.duplicated(keep="first")]
 
     # Re-normalize to the profile's own max, so peak_kwh_per_quarter is
     # reached exactly at the profile's peak moment (observed max was

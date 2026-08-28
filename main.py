@@ -37,8 +37,14 @@ def main() -> None:
     # PV: PVGIS levert uur-resolutie -- upsamplen naar kwartier
     # (interpoleren, niet downsamplen -- anders middel je de
     # kwartier-piek van load juist weg, precies andersom van wat je wil).
-    pv = get_pv_profile()
-    pv_quarter = pv.resample("15min").interpolate("linear")
+    pv = get_pv_profile()  # vermogen in W, geen energie
+    pv_quarter_w = pv.resample("15min").interpolate("linear")  # nog steeds W
+
+    # W -> kWh per kwartier: vermogen x tijdsduur, pas hier doen (niet
+    # eerder), want interpoleren van vermogen over tijd is fysisch
+    # correct, maar de omrekening naar energie heeft de uiteindelijke
+    # tijdstapgrootte nodig.
+    pv_quarter = pv_quarter_w * CONFIG.sim.timestep_hours / 1000
 
     # Load: Liander K&O-profiel is al kwartier-resolutie.
     load = get_load_profile(peak_kwh_per_quarter=CONFIG.building.peak_kwh_per_quarter)
@@ -57,6 +63,9 @@ def main() -> None:
     # dan load (origineel) -- inner join op wat daadwerkelijk overlapt.
     pv_quarter, load = pv_quarter.align(load, join="inner")
     prices_quarter = prices_quarter.reindex(load.index, method="ffill")
+
+    surplus = pv_quarter - load
+    
 
     result = run_baseline_dispatch(
         pv_quarter,
@@ -85,6 +94,7 @@ def main() -> None:
     print(f"Import cost:    €{financials['import_cost_eur']:.2f}")
     print(f"Export revenue: €{financials['export_revenue_eur']:.2f}")
     print(f"Net cost:       €{financials['net_cost_eur']:.2f}")
+    print(f"Momenten met PV-overschot: {(surplus > 0).sum()} van {len(surplus)}")
 
 
 if __name__ == "__main__":

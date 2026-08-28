@@ -37,6 +37,11 @@ rekenmodel je gebruikt.
   echte DST-correctie zoals bij prijzen/PV, die wél op echte metingen
   draaien.
 
+- `nonexistent="shift_forward"` botst op deze dag met al bestaande rijen
+  (uniform 96/dag betekent dat 03:00-03:45 al bezet is) — 4 van de 35.040
+  kwartieren (~0,01%) worden daarom gededupliceerd, niet apart gemodelleerd.
+  Verwaarloosbaar voor jaartotalen, wel de reden dat het jaartotaal-getal
+  nooit exact op 35.040 rijen zal uitkomen.
 ---
 
 ## V1 — alleen dispatch_sim.py (regelgebaseerd)

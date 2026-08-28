@@ -20,8 +20,9 @@ def get_pv_profile(pv_config: PVConfig | None = None) -> pd.Series:
     Returns
     -------
     pd.Series
-        Hourly PV power output in W, indexed by timestamp (tz-naive,
-        rounded to the hour to align cleanly with other hourly series).
+        Hourly PV power output in W, indexed by timestamp (tz-aware,
+        Europe/Amsterdam, rounded to the hour -- matches fetch_load.py
+        and fetch_prices.py's convention).
     """
     if pv_config is None:
         pv_config = CONFIG.pv
@@ -34,7 +35,8 @@ def get_pv_profile(pv_config: PVConfig | None = None) -> pd.Series:
 
     if raw_path.exists():
         print(f"Al lokaal aanwezig, laad van schijf: {raw_path}")
-        data = pd.read_csv(raw_path, index_col=0, parse_dates=True)
+        data = pd.read_csv(raw_path, index_col=0)
+        data.index = pd.to_datetime(data.index, utc=True)  # blijft UTC; conversie gebeurt hieronder, gedeeld voor beide paden
     else:
         data, meta = get_pvgis_hourly(
             latitude=pv_config.latitude,
@@ -56,9 +58,10 @@ def get_pv_profile(pv_config: PVConfig | None = None) -> pd.Series:
 
     series = data["P"]
     idx = pd.to_datetime(series.index)
-    if idx.tz is not None:
-        idx = idx.tz_localize(None)
-    series.index = idx.round("h")
+    if idx.tz is None:
+        idx = idx.tz_localize("UTC")  # PVGIS levert UTC-gebaseerde tijdstempels
+    idx = idx.round("h")  # afronden terwijl nog in UTC -- geen DST-ambiguiteit
+    series.index = idx.tz_convert("Europe/Amsterdam")  # pas hierna omzetten
     return series
 
 
