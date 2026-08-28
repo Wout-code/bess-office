@@ -7,8 +7,6 @@
   (vereenvoudiging, niet fysiek correct — zie V2)
 - Ontladen is verliesvrij, laadverlies zit alleen bij het laden
 - Geen degradatie over tijd — capaciteit/efficiëntie blijven constant
-  (Sigenergy-garantie: 70% na 10 jaar/3.048 cycli, relevant zodra dit naar
-  een meerjarige projectie gaat)
 - Geen minimale aan/uit-tijd — batterij schakelt vrij
 - Efficiëntie/capaciteit constant, ongeacht SoC, laadsnelheid of temperatuur
 - Geen zelfontlading

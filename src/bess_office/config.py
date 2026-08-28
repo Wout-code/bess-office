@@ -4,8 +4,8 @@ from pathlib import Path
 
 @dataclass
 class BatteryConfig:
-    capacity_kwh: float = 150.0
-    power_kw: float = 50.0
+    capacity_kwh: float = 36.16  # Sigenergy SigenStor, 4x9.04 kWh module
+    power_kw: float = 20.0       # 3-fase omvormer (EC20K), o.b.v. berekende piek 13 kW
     round_trip_efficiency: float = 0.90
     min_soc_fraction: float = 0.10
     max_soc_fraction: float = 0.95
@@ -16,18 +16,20 @@ class BatteryConfig:
 class PVConfig:
     latitude: float = 52.01
     longitude: float = 4.36
-    peak_power_kw: float = 50.0
+    peak_power_kw: float = 25.0  # o.b.v. jaarverbruik-vuistregel, zie BuildingConfig
     tilt: float = 12.0
     azimuth: float = 180.0
-    mounting_place: str = "free"
-    system_loss_pct: float = 14.0  
+    mounting_place: str = "building"
+    system_loss_pct: float = 14.0
     year: int = 2023
     save_raw: bool = True
 
 
 @dataclass
 class BuildingConfig:
-    peak_kwh_per_quarter: float = 15.0  # Schaal van het verbruik
+    area_m2: float = 590.0              # "gemiddeld kantoor", Minder.nl-referentie
+    annual_kwh_per_m2: float = 115.0    # NL-gemiddelde, bandbreedte 100-150 (Energy Shift)
+    peak_kwh_per_quarter: float = 3.26  # afgeleid: (area_m2 * annual_kwh_per_m2) / profile_sum
 
 
 @dataclass
