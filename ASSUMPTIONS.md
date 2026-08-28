@@ -101,3 +101,23 @@ van correcte fysica of betere parameters.
   solver altijd de efficiëntste oplossing kiest — **nog niet
   gecontroleerd of dit ook klopt bij negatieve prijzen** (NL day-ahead
   gaat af en toe negatief). Check: `df[df["price"] < 0]` op je prijsdata.
+
+
+  ## PV- en batterijconfiguratie
+
+Dit project modelleert een **fictief/representatief MKB-kantoorpand**, geen 
+bestaand gebouw. Battery- en PV-parameters in `config.py` zijn daarom gekozen 
+als realistische default voor een gemiddeld Nederlands bedrijfspand, niet 
+gemeten of afgeleid van een specifieke locatie:
+
+- `BatteryConfig`: 150 kWh / 50 kW (0.33C), 90% round-trip efficiency — 
+  typische specificaties voor een commercieel Li-ion systeem op deze schaal.
+- `PVConfig.tilt = 12°`, `mounting_place = "free"` — aanname van een plat 
+  dak met opstelsysteem (luchtspleet), de gangbare montagevorm bij NL 
+  bedrijfspanden, in plaats van de PVGIS-default (35°, building-integrated) 
+  die eerder bij schuine daken of in-dak systemen past.
+- Horizonschaduw van naastgelegen bebouwing wordt niet meegenomen; PVGIS 
+  gebruikt alleen terreinschaduw, geen gebouwschaduw.
+
+Het `data/processed/KO_KANTOOR_ONDERWIJS`-loadprofiel van Liander is wel 
+reële meetdata; alleen de PV- en batterij-installatie eromheen is fictief.
