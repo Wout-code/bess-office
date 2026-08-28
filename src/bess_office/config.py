@@ -17,9 +17,9 @@ class PVConfig:
     latitude: float = 52.01
     longitude: float = 4.36
     peak_power_kw: float = 50.0
-    tilt: float = 35.0
+    tilt: float = 12.0
     azimuth: float = 180.0
-    mounting_place: str = "building"
+    mounting_place: str = "free"
     system_loss_pct: float = 14.0  
     year: int = 2023
     save_raw: bool = True
