@@ -1,34 +1,73 @@
-"""End-to-end baseline dispatch run, using real PV and load data.
+"""End-to-end baseline dispatch run, using real PV, load, and price data.
 
 Unlike dispatch_sim.py's own __main__ block (which tests the dispatch
 RULES against small, synthetic, hand-verifiable data), this script
-runs the REAL pipeline: fetch actual PV generation and actual building
-consumption, align them, and simulate dispatch -- the same thing the
-exploration notebook (notebooks/1.0-dispatch-baseline-test.ipynb) does
-interactively, but runnable directly from the terminal with `uv run
-main.py`, without needing to open a notebook.
+runs the REAL pipeline: fetch actual PV generation, actual building
+consumption, and actual day-ahead prices, align them to a common
+quarter-hour resolution, simulate dispatch, and translate the result
+to EUR -- runnable directly from the terminal with `uv run main.py`.
 """
+
+import pandas as pd
 
 from bess_office.config import CONFIG
 from bess_office.dispatch_sim import compute_dispatch_metrics, run_baseline_dispatch
 from bess_office.fetch_load import get_load_profile
+from bess_office.fetch_prices import get_day_ahead_prices
 from bess_office.fetch_pv import get_pv_profile
 
 
+def compute_financial_metrics(result: pd.DataFrame, prices_eur_mwh: pd.Series) -> dict:
+    """Translate the dispatch result (kWh) into EUR, as a separate step
+    AFTER the dispatch itself -- dispatch_sim.py stays kWh-only by
+    design (see ASSUMPTIONS.md, Architectuur)."""
+    prices_eur_kwh = prices_eur_mwh / 1000  # ENTSO-E levert EUR/MWh
+
+    import_cost = (result["grid_import_kwh"] * prices_eur_kwh).sum()
+    export_revenue = (result["grid_export_kwh"] * prices_eur_kwh).sum()
+
+    return {
+        "import_cost_eur": import_cost,
+        "export_revenue_eur": export_revenue,
+        "net_cost_eur": import_cost - export_revenue,
+    }
+
+
 def main() -> None:
-    pv = get_pv_profile()  # uses CONFIG.pv
+    # PV: PVGIS levert uur-resolutie -- upsamplen naar kwartier
+    # (interpoleren, niet downsamplen -- anders middel je de
+    # kwartier-piek van load juist weg, precies andersom van wat je wil).
+    pv = get_pv_profile()
+    pv_quarter = pv.resample("15min").interpolate("linear")
+
+    # Load: Liander K&O-profiel is al kwartier-resolutie.
     load = get_load_profile(peak_kwh_per_quarter=CONFIG.building.peak_kwh_per_quarter)
-    load_hourly = load.resample("1h").sum()  # match PV's hourly resolution
+
+    # Prijzen: 2023 was nog uur-resolutie (voor de SDAC 15-min-overstap
+    # van okt 2025) -- ffill naar kwartier, niet interpoleren, want de
+    # prijs was toen echt 1 waarde per uur, geen geleidelijke overgang.
+    prices = get_day_ahead_prices(
+        pd.Timestamp(f"{CONFIG.pv.year}-01-01", tz="Europe/Amsterdam"),
+        pd.Timestamp(f"{CONFIG.pv.year + 1}-01-01", tz="Europe/Amsterdam"),
+    )
+    prices_quarter = prices.resample("15min").ffill()
+
+    # Uitlijnen: alle drie tz-aware/kwartier, maar PV (geinterpoleerd)
+    # en prijzen (ge-ffilled) kunnen aan de randen net iets anders lopen
+    # dan load (origineel) -- inner join op wat daadwerkelijk overlapt.
+    pv_quarter, load = pv_quarter.align(load, join="inner")
+    prices_quarter = prices_quarter.reindex(load.index, method="ffill")
 
     result = run_baseline_dispatch(
-        pv,
-        load_hourly,
+        pv_quarter,
+        load,
         CONFIG.battery,
         peak_threshold_kw=CONFIG.dispatch.peak_threshold_kw,
         timestep_hours=CONFIG.sim.timestep_hours,
     )
 
     metrics = compute_dispatch_metrics(result, peak_threshold_kw=CONFIG.dispatch.peak_threshold_kw)
+    financials = compute_financial_metrics(result, prices_quarter)
 
     print(result.head())
     print()
@@ -42,6 +81,10 @@ def main() -> None:
     print()
     print(f"Total grid import: {result['grid_import_kwh'].sum():.2f} kWh")
     print(f"Total grid export: {result['grid_export_kwh'].sum():.2f} kWh")
+    print()
+    print(f"Import cost:    €{financials['import_cost_eur']:.2f}")
+    print(f"Export revenue: €{financials['export_revenue_eur']:.2f}")
+    print(f"Net cost:       €{financials['net_cost_eur']:.2f}")
 
 
 if __name__ == "__main__":
