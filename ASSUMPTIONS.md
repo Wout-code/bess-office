@@ -1,12 +1,53 @@
 # Aannames — bess-office
 
-# V1 — alleen dispatch_sim.py (regelgebaseerd)
+## Data & referentiecasus (geldt voor V1 én V2 — gaat over de invoer, niet de berekening)
+
+Dit zijn geen aannames over hoe er gerekend wordt (dat staat bij V1/V2
+hieronder) — dit gaat over wat de data zelf voorstelt en waar de
+beperkingen daarin zitten. Identiek van toepassing ongeacht welk
+rekenmodel je gebruikt.
+
+**Referentiepand**
+- Representatief, geen echt gemeten pand — 590 m² en NL-gemiddelde
+  verbruiksintensiteit (115 kWh/m²/jaar). Zie `config.py` voor bronnen.
+
+**Batterijmodel**
+- Sigenergy SigenStor gekozen: 36,16 kWh (35,04 kWh bruikbaar), ~20 kW
+  3-fase omvormer (EC20K). Geen willekeurige keuze — het berekende
+  piekvermogen van het referentiepand (13 kW) en de
+  capaciteit-t.o.v.-dagverbruik-verhouding (~19%) wezen beide naar deze
+  schaal, in plaats van de grotere Deye GE-F60-lijn (60 kWh/100 kW) die
+  specifiek voor zwaardere kantoorpanden wordt gemarket. Zie `config.py`
+  voor het productblad. Zie jupyter notebook 0.2
+
+**PV-data (PVGIS)**
+- PVGIS gebruikt standaard (`usehorizon=True`, geen `userhorizon`) een
+  terreinschaduw-model op basis van een hoogtekaart — dat ziet natuurlijke
+  verhogingen (heuvels), maar geen gebouwen. Staat het referentiepand op
+  een bedrijventerrein/binnenstedelijk met hogere buurpanden die
+  vroeg/laat schaduw werpen, dan onderschat PVGIS die verliezen
+  structureel, zonder waarschuwing in de output — de PV-opbrengst is dan
+  te hoog ingeschat.
+
+**Load-data (Liander K&O-profiel)**
+- Genormaliseerd profiel, geen echte meting — daardoor ook geen echte
+  klokwissel-onregelmatigheid (365×96 kwartieren, geen gaps). Bij
+  tz-aware maken is daarom een bewuste, pragmatische keuze nodig
+  (`nonexistent="shift_forward"`, `ambiguous=True`) in plaats van een
+  echte DST-correctie zoals bij prijzen/PV, die wél op echte metingen
+  draaien.
+
+---
+
+## V1 — alleen dispatch_sim.py (regelgebaseerd)
 
 **Batterij**
 - Symmetrisch laad-/ontlaadvermogen — zelfde vermogen beide richtingen
   (vereenvoudiging, niet fysiek correct — zie V2)
 - Ontladen is verliesvrij, laadverlies zit alleen bij het laden
 - Geen degradatie over tijd — capaciteit/efficiëntie blijven constant
+  (Sigenergy-garantie: 70% na 10 jaar/3.048 cycli, relevant zodra dit naar
+  een meerjarige projectie gaat)
 - Geen minimale aan/uit-tijd — batterij schakelt vrij
 - Efficiëntie/capaciteit constant, ongeacht SoC, laadsnelheid of temperatuur
 - Geen zelfontlading
@@ -27,14 +68,6 @@
   energiestroom-simulatie, financiële vertaling gebeurt elders
 - Batterij kan structureel nooit vanaf het net laden — alleen vanaf
   PV-overschot
-
-**PV**
-- PVGIS gebruikt standaard (`usehorizon=True`, geen `userhorizon`) een
-  terreinschaduw-model op basis van een hoogtekaart -- dat ziet natuurlijke
-  verhogingen (heuvels), maar geen gebouwen. Staat je kantoorpand op een
-  bedrijventerrein/binnenstedelijk met hogere buurpanden die vroeg/laat
-  schaduw werpen, dan onderschat PVGIS die verliezen structureel, zonder
-  waarschuwing in de output -- de PV-opbrengst is dan te hoog ingeschat.
 
 ---
 
@@ -68,14 +101,6 @@ van correcte fysica of betere parameters.
 **Architectuur**
 - Grid-charging wordt mogelijk
 
-**PV**
-- PVGIS gebruikt standaard (`usehorizon=True`, geen `userhorizon`) een
-  terreinschaduw-model op basis van een hoogtekaart -- dat ziet natuurlijke
-  verhogingen (heuvels), maar geen gebouwen. Staat je kantoorpand op een
-  bedrijventerrein/binnenstedelijk met hogere buurpanden die vroeg/laat
-  schaduw werpen, dan onderschat PVGIS die verliezen structureel, zonder
-  waarschuwing in de output -- de PV-opbrengst is dan te hoog ingeschat.
-
 ## dispatch_sim.py specifiek (blijft regelgebaseerd)
 
 **Tijd**
@@ -86,7 +111,7 @@ van correcte fysica of betere parameters.
 - Nog steeds geen kosten in het model zelf — architecturale keuze,
   financiële vertaling gebeurt elders, blijft zo
 
-## optimize.py 
+## optimize.py
 
 **Tijd**
 - Perfecte forecast binnen de horizon — "geen vooruitkijken" vervalt
@@ -99,23 +124,3 @@ van correcte fysica of betere parameters.
   solver altijd de efficiëntste oplossing kiest — **nog niet
   gecontroleerd of dit ook klopt bij negatieve prijzen** (NL day-ahead
   gaat af en toe negatief). Check: `df[df["price"] < 0]` op je prijsdata.
-
-
-  ## PV- en batterijconfiguratie
-
-Dit project modelleert een **fictief/representatief MKB-kantoorpand**, geen 
-bestaand gebouw. Battery- en PV-parameters in `config.py` zijn daarom gekozen 
-als realistische default voor een gemiddeld Nederlands bedrijfspand, niet 
-gemeten of afgeleid van een specifieke locatie:
-
-- `BatteryConfig`: 150 kWh / 50 kW (0.33C), 90% round-trip efficiency — 
-  typische specificaties voor een commercieel Li-ion systeem op deze schaal.
-- `PVConfig.tilt = 12°`, `mounting_place = "free"` — aanname van een plat 
-  dak met opstelsysteem (luchtspleet), de gangbare montagevorm bij NL 
-  bedrijfspanden, in plaats van de PVGIS-default (35°, building-integrated) 
-  die eerder bij schuine daken of in-dak systemen past.
-- Horizonschaduw van naastgelegen bebouwing wordt niet meegenomen; PVGIS 
-  gebruikt alleen terreinschaduw, geen gebouwschaduw.
-
-Het `data/processed/KO_KANTOOR_ONDERWIJS`-loadprofiel van Liander is wel 
-reële meetdata; alleen de PV- en batterij-installatie eromheen is fictief.
