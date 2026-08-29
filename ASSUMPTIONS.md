@@ -7,6 +7,16 @@ hieronder) — dit gaat over wat de data zelf voorstelt en waar de
 beperkingen daarin zitten. Identiek van toepassing ongeacht welk
 rekenmodel je gebruikt.
 
+**Tijdzone**
+- Alle drie databronnen (load, PV, prijzen) worden expliciet omgezet naar
+  Europe/Amsterdam, niet UTC. Reden: het capaciteitstarief en
+  dispatch-beslissingen zijn gebonden aan lokale kloktijd (bv.
+  "avondpiek om 18:00"), niet aan UTC. Prijs die daarvoor betaald wordt:
+  de klokwissels in maart/oktober moeten expliciet afgehandeld worden
+  (zie Load-data/PV-data hieronder) — UTC had die complexiteit vermeden,
+  maar zou resultaten minder direct herkenbaar maken t.o.v. de
+  werkelijke lokale gebruikssituatie.
+
 **Referentiepand**
 - Representatief, geen echt gemeten pand — 590 m² en NL-gemiddelde
   verbruiksintensiteit (115 kWh/m²/jaar). Zie `config.py` voor bronnen.
