@@ -53,15 +53,15 @@ class GridTariffConfig:
     echte netbeheerder-tarieventabel (Liander/Stedin/Enexis) voordat
     optimize.py hiermee gaat rekenen. Tarieven verschillen per netbeheerder.
     """
-    # 1. Transporttarief: over het totale jaarvolume, kWh -- geen piek-relatie
+    # 1. Transporttarief: over het totale jaarvolume, kWh -- geen piek-relatie, deze word wel gebruikt in de optimalisatie
     transport_tariff_eur_per_kwh: float | None = None
 
-    # 2. Gecontracteerd transportvermogen (GTV): vaste, gekozen grens (kW)
+    # 2. Gecontracteerd transportvermogen (GTV): vaste, gekozen grens (kW) deze word niet gebruikt in de optimalisatie
     #    en de vaste prijs die je daarvoor betaalt, ongeacht werkelijk gebruik
     contracted_capacity_kw: float | None = None
     contracted_capacity_tariff_eur_per_kw: float | None = None
 
-    # 3. Boetetarief bij overschrijding van de gecontracteerde piek --
+    # 3. Boetetarief bij overschrijding van de gecontracteerde piek -- deze word wel gebruikt in de optimalisatie
     #    dit is de term die optimize.py's doelfunctie zal gebruiken
     overshoot_penalty_eur_per_kw: float | None = None
 

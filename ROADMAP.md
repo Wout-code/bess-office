@@ -46,7 +46,7 @@ LP) die aantoont waar optimalisatie wel/niet meerwaarde heeft.
 
 ---
 
-## Fase 2 — Multi-objective optimalisatie (peak shaving + arbitrage)
+## Fase 2 — optimaliseren van zelfconsumptie, 
 
 **Wat:** uitbreiden van de doelfunctie in optimize.py naar een gewogen
 combinatie van piekvermogenkosten én energiekosten (day-ahead-prijzen).
