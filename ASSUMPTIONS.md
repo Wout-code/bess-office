@@ -17,6 +17,14 @@ rekenmodel je gebruikt.
   maar zou resultaten minder direct herkenbaar maken t.o.v. de
   werkelijke lokale gebruikssituatie.
 
+**Resolutie**
+- Kwartier, voor beide bestanden identiek — geen V1/V2-verschil. Dit was
+  altijd een `main.py`-keuze (welke data je aanlevert), nooit iets in
+  `dispatch_sim.py`/`optimize.py` zelf: beide nemen gewoon
+  `timestep_hours` als parameter en rekenen met wat ze krijgen. `main.py`
+  upsamplet PV naar kwartier (i.p.v. load downsamplen naar uur), zodat de
+  factuurbepalende kwartier-piek niet wegmiddelt.
+
 **Referentiepand**
 - Representatief, geen echt gemeten pand — 590 m² en NL-gemiddelde
   verbruiksintensiteit (115 kWh/m²/jaar). Zie `config.py` voor bronnen.
@@ -28,7 +36,7 @@ rekenmodel je gebruikt.
   capaciteit-t.o.v.-dagverbruik-verhouding (~19%) wezen beide naar deze
   schaal, in plaats van de grotere Deye GE-F60-lijn (60 kWh/100 kW) die
   specifiek voor zwaardere kantoorpanden wordt gemarket. Zie `config.py`
-  voor het productblad. Zie jupyter notebook 0.2
+  voor het productblad.
 
 **PV-data (PVGIS)**
 - PVGIS gebruikt standaard (`usehorizon=True`, geen `userhorizon`) een
@@ -47,11 +55,6 @@ rekenmodel je gebruikt.
   echte DST-correctie zoals bij prijzen/PV, die wél op echte metingen
   draaien.
 
-- `nonexistent="shift_forward"` botst op deze dag met al bestaande rijen
-  (uniform 96/dag betekent dat 03:00-03:45 al bezet is) — 4 van de 35.040
-  kwartieren (~0,01%) worden daarom gededupliceerd, niet apart gemodelleerd.
-  Verwaarloosbaar voor jaartotalen, wel de reden dat het jaartotaal-getal
-  nooit exact op 35.040 rijen zal uitkomen.
 ---
 
 ## V1 — alleen dispatch_sim.py (regelgebaseerd)
@@ -68,10 +71,7 @@ rekenmodel je gebruikt.
 - Geen zelfontlading
 
 **Tijd**
-- Vaste tijdstap van 1 uur; `load` naar 1h geresampled, wat een
-  kwartier-piek wegmiddelt — gerapporteerde pieken zijn vermoedelijk een
-  onderschatting van de piek die de factuur bepaalt
-- Geen vooruitkijken — puur reactief, elk uur op zichzelf
+- Geen vooruitkijken — puur reactief, elk kwartier op zichzelf
 
 **Markt/Net**
 - Eén vaste, statische peak-drempel voor het hele jaar
@@ -104,9 +104,6 @@ van correcte fysica of betere parameters.
 - Geen minimale aan/uit-tijd — batterij schakelt vrij
 - Efficiëntie/capaciteit constant, ongeacht SoC, laadsnelheid of temperatuur
 - Geen zelfontlading
-
-**Tijd**
-- Kwartier-resolutie i.p.v. uur
 
 **Markt/Net**
 - Geoptimaliseerde peak-drempel i.p.v. vaste jaardrempel — in
