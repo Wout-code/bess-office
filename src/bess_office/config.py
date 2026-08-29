@@ -41,7 +41,7 @@ class SimConfig:
 @dataclass
 class DispatchConfig:
     """Rule-based dispatch (dispatch_sim.py) specific settings."""
-    peak_threshold_kw: float = 20.0
+    peak_threshold_kw: float = 2.5
 
 
 @dataclass
