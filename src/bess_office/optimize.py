@@ -23,7 +23,8 @@ highspy`, then SolverFactory("appsi_highs")). This file defaults to CBC.
 # regel 133 fout, neemt een piek kost voor het hele jaar moet per maand
 #regel 83, mischien anders indelen met de config, want het is een beetje dubbel maar niet urgent
 #moet mogelijk slijtage toevoegen
-
+# loophole dat bij negatieve prijzen het nuttig is om te laden en te onladen door, alleen fysisch is dit achterlijk, dus los dit op door slijtage toe te voegen
+# hij pakt een peak import, in plaats van de peak import van elke maand
 import pandas as pd
 import pyomo.environ as pyo
 
@@ -100,18 +101,9 @@ def run_lp_dispatch(
     # input, de solver kiest zelf de kostenminimaliserende piek.
     model.peak_import_kw = pyo.Var(bounds=(0, None))
 
-    # LET OP (BAT-7 in ASSUMPTIONS.md): geen binaire constraint die
-    # simultaan laden/ontladen verbiedt. De aanname is dat de solver dit
-    # vanzelf vermijdt omdat het via round_trip_efficiency < 1 altijd
-    # verlies oplevert -- behalve mogelijk bij negatieve prijzen.
-    # Check na het oplossen: (result["charge_kwh"] > 0) & (result["discharge_kwh"] > 0)
-    # zou overal False moeten zijn. Zo niet: dit wordt een MILP met een
-    # binaire is_charging-variabele per tijdstap.
-
     def soc_rule(m, t):
         prev_soc = initial_soc if t == 0 else m.soc[t - 1]
-        # Zelfde vereenvoudiging als V1: ontladen is verliesvrij,
-        # laadverlies zit alleen bij het laden (ASSUMPTIONS.md, Batterij).
+        # laadverlies zit alleen bij het laden (ASSUMPTIONS.md, Batterij) BAT-2
         return m.soc[t] == prev_soc + m.charge[t] * battery.round_trip_efficiency - m.discharge[t]
 
     model.soc_dynamics = pyo.Constraint(model.T, rule=soc_rule)
@@ -133,7 +125,7 @@ def run_lp_dispatch(
         energy_cost = sum(
             (m.grid_import[t] - m.grid_export[t]) * prices_eur_kwh[t] for t in m.T
         )
-        peak_cost = m.peak_import_kw * grid_tariff.contracted_capacity_tariff_eur_per_kw # foute aaname, moet per kwartier, is nu per uur
+        peak_cost = m.peak_import_kw * grid_tariff.contracted_capacity_tariff_eur_per_kw 
         return energy_cost + peak_cost
 
     model.objective = pyo.Objective(rule=objective_rule, sense=pyo.minimize)
