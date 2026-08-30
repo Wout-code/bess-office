@@ -52,7 +52,7 @@ class GridTariffConfig:
     TODO: alle waarden zijn nog placeholders (None) -- opzoeken bij een
     echte netbeheerder-tarieventabel (Liander/Stedin/Enexis) voordat
     optimize.py hiermee gaat rekenen. Tarieven verschillen per netbeheerder.
-    """
+    """ 
     # 1. Transporttarief: over het totale jaarvolume, kWh -- geen piek-relatie, deze word wel gebruikt in de optimalisatie
     transport_tariff_eur_per_kwh: float | None = None
 

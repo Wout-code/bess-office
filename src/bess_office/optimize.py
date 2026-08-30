@@ -18,6 +18,12 @@ conda-forge coincbc`, or download a CBC binary) or HiGHS (`pip install
 highspy`, then SolverFactory("appsi_highs")). This file defaults to CBC.
 """
 
+# regel 34 fout
+#regel 71 mogelijke foute error
+# regel 133 fout, neemt een piek kost voor het hele jaar moet per maand
+#regel 83, mischien anders indelen met de config, want het is een beetje dubbel maar niet urgent
+#moet mogelijk slijtage toevoegen
+
 import pandas as pd
 import pyomo.environ as pyo
 
@@ -72,7 +78,7 @@ def run_lp_dispatch(
         )
 
     timestamps = list(pv_kwh.index)
-    prices_eur_kwh = (prices_eur_mwh / 1000).to_numpy()
+    prices_eur_kwh = (prices_eur_mwh / 1000).to_numpy() #/1000 is for converting MWh to kWh
     pv = pv_kwh.to_numpy()
     load = load_kwh.to_numpy()
 
@@ -127,7 +133,7 @@ def run_lp_dispatch(
         energy_cost = sum(
             (m.grid_import[t] - m.grid_export[t]) * prices_eur_kwh[t] for t in m.T
         )
-        peak_cost = m.peak_import_kw * grid_tariff.contracted_capacity_tariff_eur_per_kw
+        peak_cost = m.peak_import_kw * grid_tariff.contracted_capacity_tariff_eur_per_kw # foute aaname, moet per kwartier, is nu per uur
         return energy_cost + peak_cost
 
     model.objective = pyo.Objective(rule=objective_rule, sense=pyo.minimize)
@@ -159,9 +165,9 @@ def run_lp_dispatch(
 
 
 if __name__ == "__main__":
-    # Kleine, synthetische test -- zelfde aanpak als dispatch_sim.py's
+    # Kleine, synthetische test -
     # eigen __main__-blok: losse logica-check met kleine, verifieerbare
-    # data, geen echte databronnen (die integratie hoort in main.py).
+    # data, geen echte databronnen x
     import numpy as np
 
     hours = pd.date_range("2023-06-01", periods=24, freq="1h")
