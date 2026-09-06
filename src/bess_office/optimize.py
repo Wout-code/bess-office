@@ -23,8 +23,12 @@ highspy`, then SolverFactory("appsi_highs")). This file defaults to CBC.
 # regel 133 fout, neemt een piek kost voor het hele jaar moet per maand
 #regel 83, mischien anders indelen met de config, want het is een beetje dubbel maar niet urgent
 #moet mogelijk slijtage toevoegen
-# loophole dat bij negatieve prijzen het nuttig is om te laden en te onladen door, alleen fysisch is dit achterlijk, dus los dit op door slijtage toe te voegen
+# loophole dat bij negatieve prijzen het nuttig is om te laden en te onladen door, alleen fysisch is dit achterlijk, dus los dit
+#  op door slijtage toe te voegen of iets doen met dat heen en weer rendement niet hetzelfde is. 
 # hij pakt een peak import, in plaats van de peak import van elke maand
+# bat - 7 , assymetrisch laad en otnlaadvermogen nog niet verwerkt
+# data fout gevonden dus
+
 import pandas as pd
 import pyomo.environ as pyo
 

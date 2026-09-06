@@ -63,6 +63,10 @@ rekenmodel je gebruikt.
   echte DST-correctie zoals bij prijzen/PV, die wél op echte metingen
   draaien.
 
+**DATA-7 — Load-profiel afvlakking (Gelijktijdigheid)**
+
+- Omdat het Liander K&O-profiel een wiskundig gemiddelde is van honderden panden, is de curve afgevlakt (gelijktijdigheidsfactor). De vlijmscherpe, kortstondige vermogenspieken en de diepe nul-verbruik dalen van een individueel fysiek gebouw ontbreken. Voor het LP-optimalisatiemodel betekent dit dat peak shaving waarschijnlijk efficiënter en goedkoper wordt ingeschat dan in werkelijkheid: een brede, lagere piek is voor de batterij eenvoudiger weg te werken dan een grillige naaldpiek. Het berekende financiële rendement voor de geoptimaliseerde piek-drempel is hierdoor een robuuste benadering, maar valt in de fysieke realiteit mogelijk iets conservatiever uit.
+
 ---
 
 ## V1 — alleen dispatch_sim.py (regelgebaseerd)
