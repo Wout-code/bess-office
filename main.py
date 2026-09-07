@@ -23,11 +23,11 @@ def compute_financial_metrics(result: pd.DataFrame, prices_eur_mwh: pd.Series) -
     design (see ASSUMPTIONS.md, Architectuur)."""
     prices_eur_kwh = prices_eur_mwh / 1000  # ENTSO-E levert EUR/MWh
 
-    import_cost = (result["grid_import_kwh"] * prices_eur_kwh).sum()
+    import_cost = (result["grid_import_kwh"] * prices_eur_kwh).sum()    # ARCH-5
     export_revenue = (result["grid_export_kwh"] * prices_eur_kwh).sum()
 
     return {
-        "import_cost_eur": import_cost,
+        "import_cost_eur": import_cost,   
         "export_revenue_eur": export_revenue,
         "net_cost_eur": import_cost - export_revenue,
     }

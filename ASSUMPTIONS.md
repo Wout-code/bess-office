@@ -67,6 +67,17 @@ rekenmodel je gebruikt.
 
 - Omdat het Liander K&O-profiel een wiskundig gemiddelde is van honderden panden, is de curve afgevlakt (gelijktijdigheidsfactor). De vlijmscherpe, kortstondige vermogenspieken en de diepe nul-verbruik dalen van een individueel fysiek gebouw ontbreken. Voor het LP-optimalisatiemodel betekent dit dat peak shaving waarschijnlijk efficiënter en goedkoper wordt ingeschat dan in werkelijkheid: een brede, lagere piek is voor de batterij eenvoudiger weg te werken dan een grillige naaldpiek. Het berekende financiële rendement voor de geoptimaliseerde piek-drempel is hierdoor een robuuste benadering, maar valt in de fysieke realiteit mogelijk iets conservatiever uit.
 
+**ARCH-5 - Symmetrische import-/exportprijzen**
+- `compute_financial_metrics` waardeert import en export tegen dezelfde
+day-ahead-prijs. In werkelijkheid mist export het vermeden-transporttarief
+dat zelfconsumptie wél bespaart, en wordt teruglevering bij grootverbruik
+doorgaans lager vergoed dan de volledige importprijs (marktprijs-gekoppeld
+leverancierscontract -- bij grootverbruik is er geen saldering, dus geen
+vaste 1-op-1-verrekening om op terug te vallen). Richting van de fout:
+dit overwaardeert export, en dus een grotere PV-installatie t.o.v. een
+kleinere. Kwantitatieve correctie vereist een reëel terugleverings-
+contract-getal dat nu niet beschikbaar is -- TODO.
+
 ---
 
 ## V1 — alleen dispatch_sim.py (regelgebaseerd)
