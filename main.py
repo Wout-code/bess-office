@@ -12,7 +12,7 @@ import pandas as pd
 
 from bess_office.config import CONFIG
 from bess_office.dispatch_sim import compute_dispatch_metrics, run_baseline_dispatch
-from bess_office.fetch_load import get_load_profile
+from bess_office.fetch_load import derive_peak_kwh_per_quarter, get_relative_profile
 from bess_office.fetch_prices import get_day_ahead_prices
 from bess_office.fetch_pv import get_pv_profile
 
@@ -46,8 +46,21 @@ def main() -> None:
     # tijdstapgrootte nodig.
     pv_quarter = pv_quarter_w * CONFIG.sim.timestep_hours / 1000
 
-    # Load: Liander K&O-profiel is al kwartier-resolutie.
-    load = get_load_profile(peak_kwh_per_quarter=CONFIG.building.peak_kwh_per_quarter)
+    # Load: profielvorm (Liander K&O, al kwartier-resolutie) apart ophalen
+    # van de schaal. peak_kwh_per_quarter is GEEN vast gebouwskenmerk --
+    # hij hangt zowel af van het gewenste jaarverbruik (area_m2 x
+    # annual_kwh_per_m2, extern verifieerbaar) als van hoe piekig dít
+    # specifieke profiel is (relative_profile.sum() -- verandert als je
+    # ooit van profielbestand wisselt). Die afhankelijkheid hier expliciet
+    # houden i.p.v. verstopt in een losse config-constante (zie
+    # ASSUMPTIONS.md voor de discussie).
+    relative_profile = get_relative_profile()
+    peak_kwh_per_quarter = derive_peak_kwh_per_quarter(
+        area_m2=CONFIG.building.area_m2,
+        annual_kwh_per_m2=CONFIG.building.annual_kwh_per_m2,
+        relative_profile=relative_profile,
+    )
+    load = relative_profile * peak_kwh_per_quarter
 
     # Prijzen: 2023 was nog uur-resolutie (voor de SDAC 15-min-overstap
     # van okt 2025) -- ffill naar kwartier, niet interpoleren, want de
@@ -65,7 +78,6 @@ def main() -> None:
     prices_quarter = prices_quarter.reindex(load.index, method="ffill")
 
     surplus = pv_quarter - load
-    
 
     result = run_baseline_dispatch(
         pv_quarter,
@@ -78,6 +90,9 @@ def main() -> None:
     metrics = compute_dispatch_metrics(result, peak_threshold_kw=CONFIG.dispatch.peak_threshold_kw)
     financials = compute_financial_metrics(result, prices_quarter)
 
+    print(f"Gebruikt peak_kwh_per_quarter: {peak_kwh_per_quarter:.2f} kWh "
+          f"(uit {CONFIG.building.area_m2:.0f} m2 x {CONFIG.building.annual_kwh_per_m2:.0f} kWh/m2/jaar)")
+    print()
     print(result.head())
     print()
     print(f"Peak without battery: {metrics['peak_import_no_battery_kw']:.2f} kW")
