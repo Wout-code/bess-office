@@ -29,7 +29,7 @@ class PVConfig:
 class BuildingConfig:
     area_m2: float = 590.0              # "gemiddeld kantoor", Minder.nl-referentie
     annual_kwh_per_m2: float = 115.0    # NL-gemiddelde, bandbreedte 100-150 (Energy Shift)
-    peak_kwh_per_quarter: float = 3.26  # afgeleid: (area_m2 * annual_kwh_per_m2) / profile_sum
+    
 
 
 @dataclass
