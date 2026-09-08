@@ -74,10 +74,8 @@ class SimConfig:
 @dataclass
 class DispatchConfig:
     """Rule-based dispatch (dispatch_sim.py) specific settings."""
-    peak_threshold_kw: float = 2.5
-    # TODO: hoort bij de oude kleinverbruik-schaal (piek was 13 kW). Op
-    # grootverbruik-schaal (piek ~99,4 kW) is 2,5 kW een zinloos lage
-    # drempel -- opnieuw bepalen.
+    peak_threshold_kw: float = 99.4
+    
 
 
 @dataclass
