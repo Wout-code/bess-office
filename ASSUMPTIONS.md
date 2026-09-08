@@ -245,3 +245,13 @@ van correcte fysica of betere parameters.
   omdat de solver altijd de efficiëntste oplossing kiest — **nog niet
   gecontroleerd of dit ook klopt bij negatieve prijzen** (NL day-ahead
   gaat af en toe negatief). Check: `df[df["price"] < 0]` op je prijsdata.
+
+
+
+
+  ## Belangerijke context geen aanames
+  *Context, geen aanname*: bij 99 kW blijft dit systeem onder de 100 kW-
+  drempel waarboven een congestiemanagementcontract relevant wordt
+  (RVO Flex-e-voorwaarden: vermogen van de maatregel, niet de
+  aansluiting, is bepalend). Feitelijk gegeven, geen keuze — vermeld
+  omdat het de 99 kW-keuze in een breder regulatoir kader plaatst.
