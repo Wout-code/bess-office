@@ -30,3 +30,14 @@ De partijen die de batterij bezitten (asset owners/investeerders) weten dat gara
 
 3. De Tech-Giganten: Eigen testlaboratoria
 Grote spelers als Tesla (met Autobidder), Fluence, of energiereuzen (zoals RWE of Vattenfall) accepteren geen black-box van fabrikanten of externe software. Zij kopen zeecontainers vol batterijcellen, zetten die in hun eigen R&D-centra in klimaatkasten, en cyclen ze zelf maandenlang helemaal kapot op verschillende DoD's en temperaturen. Zij creëren de data zelf.
+
+4. een groep die mogelijk naief is
+
+5. Onderzoek van wang et al. (2011) onder een bepaalde c-rate is de dod niet meer de dominante schade veroozaker
+
+
+
+
+## Degradatie lithuim-ion batterijen
+
+"De degradatie van lithium-ion batterijen is sterk afhankelijk van de toepassingscontext. Waar EV-toepassingen door hoge C-rates en snelladen gedreven worden door mechanische slijtage en cyclusdiepte (DoD), opereren stationaire BESS-systemen (zoals de BOLT-241) in een mild C-rate regime ($\le 0.5\text{C}$). Uit literatuur (o.a. Wang et al., 2011) blijkt dat in dit regime kalenderveroudering en tijd dominanter zijn dan de dynamische cyclusstress."
