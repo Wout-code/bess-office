@@ -33,6 +33,7 @@ Grote spelers als Tesla (met Autobidder), Fluence, of energiereuzen (zoals RWE o
 
 4. een groep die mogelijk naief is
 
+
 5. Onderzoek van wang et al. (2011) onder een bepaalde c-rate is de dod niet meer de dominante schade veroozaker
 
 
@@ -41,3 +42,27 @@ Grote spelers als Tesla (met Autobidder), Fluence, of energiereuzen (zoals RWE o
 ## Degradatie lithuim-ion batterijen
 
 "De degradatie van lithium-ion batterijen is sterk afhankelijk van de toepassingscontext. Waar EV-toepassingen door hoge C-rates en snelladen gedreven worden door mechanische slijtage en cyclusdiepte (DoD), opereren stationaire BESS-systemen (zoals de BOLT-241) in een mild C-rate regime ($\le 0.5\text{C}$). Uit literatuur (o.a. Wang et al., 2011) blijkt dat in dit regime kalenderveroudering en tijd dominanter zijn dan de dynamische cyclusstress."
+
+
+## Waarom LP blijven in plaats van MILP
+
+1. Oplostijd schaalt slecht (het grootste praktische probleem)
+
+LP is polynomiaal oplosbaar (interior point/simplex, ~seconden voor jouw schaal). MILP is NP-hard — de solver moet een branch-and-bound boom doorzoeken. Bij een jaarsimulatie op 15-min resolutie (35.040 timesteps) met bijvoorbeeld een binary voor charge/discharge-exclusiviteit, ga je van "los het hele jaar in één keer op" naar mogelijk uren rekentijd, of je moet rolling-horizon/windowing toepassen. Bij MPC (wat je toch gaat doen in je MSc) is dit direct relevant: als je een MILP elke stap opnieuw moet oplossen binnen een control-interval, kan de oplostijd de haalbaarheid van real-time toepassing breken.
+
+2. Geen garantie op globaal optimum binnen praktische tijd
+
+Bij LP weet je: als de solver terugkomt met een oplossing, is die gegarandeerd globaal optimaal (convex probleem). Bij MILP moet je vaak een optimality gap accepteren (bv. solver stopt bij 1% gap na X minuten) omdat exact oplossen te lang duurt. Dat betekent je resultaten zijn technisch "goed genoeg" maar niet bewijsbaar optimaal, wat lastig is als je je model wilt claimen als transparant/reproduceerbaar — een kernpunt van je project.
+
+3. Combinatorische explosie bij meerdere binaries
+
+Eén binary (bv. charge/discharge exclusiviteit) is meestal nog te doen. Maar zodra je dat combineert met bv. min. aan/uit-tijd (BAT-4), start/stop-kosten, én misschien later meerdere batterijen of multi-market participatie, groeit de complexiteit niet lineair maar exponentieel in het aantal binaries × tijdstappen. Dit is precies waarom BAT-4 loslaten praktisch waarde had — niet alleen omdat het fysiek onnodig is, maar omdat het je oplosbaarheid drastisch zou verslechteren voor een fysiek irrelevant effect.
+
+4. Gevoeliger voor numerieke issues en solver-keuze
+
+MILP-solvers (bv. HiGHS, CBC, Gurobi, CPLEX) verschillen veel meer in performance en robuustheid dan LP-solvers. Je transparantie/reproduceerbaarheid-doel wordt lastiger: een open-source MILP-solver (HiGHS/CBC) kan significant trager of minder stabiel zijn dan een commerciële (Gurobi), en dat raakt je "open-source, transparant" ambitie direct — licentiekosten of prestatieverschil wordt een designkeuze die je moet verantwoorden.
+
+5. Moeilijker te debuggen en analyseren
+
+Bij LP kun je duality (shadow prices, reduced costs) gebruiken om te begrijpen waarom de oplossing is wat die is — heel waardevol voor een transparant model. Bij MILP verlies je een schone dual-interpretatie zodra binaries actief zijn; sensitivity-analyse wordt veel minder rechttoe-rechtaan.
+

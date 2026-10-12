@@ -145,6 +145,8 @@ inhoud niet bij een versie-specifieke sectie, dus staan ze apart).
   GE-F60-lijn (60 kWh/100 kW). 13 kW piek is niet meer van toepassing na
   DATA-8.
 
+  **VRAAG AAN AI OM DIT WEG TE HALEN**
+
 ---
 
 ## V1 — alleen dispatch_sim.py (regelgebaseerd)
