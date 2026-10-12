@@ -9,25 +9,43 @@ input), costs inside the objective, perfect-forecast horizon (a known
 simplification -- see ROADMAP.md Fase 3 for the MPC follow-up that
 removes it).
 
-Cost has two components (energy + peak), both already in EUR -- this is
-a single-objective LP with a richer cost function, not multi-objective
-optimization (see ROADMAP.md Fase 2 for why that distinction matters).
+Cost has two components (energy + monthly peak), both already in EUR --
+this is a single-objective LP with a richer cost function, not
+multi-objective optimization (see ROADMAP.md Fase 2 for why that
+distinction matters).
 
 Requires a solver Pyomo can call, e.g. CBC (`conda install -c
 conda-forge coincbc`, or download a CBC binary) or HiGHS (`pip install
 highspy`, then SolverFactory("appsi_highs")). This file defaults to CBC.
 """
 
-# regel 34 fout
-#regel 71 mogelijke foute error
-# regel 133 fout, neemt een piek kost voor het hele jaar moet per maand
-#regel 83, mischien anders indelen met de config, want het is een beetje dubbel maar niet urgent
-#moet mogelijk slijtage toevoegen
-# loophole dat bij negatieve prijzen het nuttig is om te laden en te onladen door, alleen fysisch is dit achterlijk, dus los dit
-#  op door slijtage toe te voegen of iets doen met dat heen en weer rendement niet hetzelfde is. 
-# hij pakt een peak import, in plaats van de peak import van elke maand
-# bat - 7 , assymetrisch laad en otnlaadvermogen nog niet verwerkt
-# data fout gevonden dus
+# Open, nog niet opgelost in dit bestand (zie ASSUMPTIONS.md / z.TODO.md):
+# - BAT-7: asymmetrisch laad-/ontlaadvermogen nog niet verwerkt, power_kw
+#   wordt nog voor beide richtingen gebruikt.
+# - BAT-3: geen degradatiekost -- de solver ziet cyclen als gratis. Dit is
+#   ook de reden voor de negatieve-prijzen-loophole: zonder een kost op
+#   doorstroom kan gelijktijdig laden/ontladen bij prijs < 0 fysisch
+#   onzinnig maar LP-optimaal lijken.
+# - BAT-4: geen minimale aan/uit-tijd, batterij kan elk kwartier wisselen.
+# - GTV/jaarlijkse-overschrijding-component (zie config.py GridTariffConfig)
+#   wordt NIET gemodelleerd -- bewuste vereenvoudiging, zie daar voor
+#   details en de TODO om dit later toe te voegen.
+#
+# Dit gesprek gefixt, samengevat (zie het statusoverzicht-document voor de
+# volledige geschiedenis van deze paar stappen):
+# - transport_tariff_eur_per_kwh ontbrak volledig uit energy_cost -- nu
+#   toegevoegd, alleen op import (export betaalt geen transporttarief,
+#   zie ASSUMPTIONS.md ARCH-5).
+# - Piekkost gebruikte eerst het verkeerde tariefveld, en later een
+#   aanname over een jaarlijks GTV/overschrijdingsmechanisme die bij
+#   verificatie tegen Liander's eigen tarievendocument onvolledig bleek:
+#   er bestaat namelijk een APARTE, maandelijkse piekcomponent ("kW max.
+#   mnd" in Liander's tabel) naast de jaarlijkse GTV-component. Dit
+#   bestand modelleert nu alleen die maandelijkse component (bewuste
+#   vereenvoudiging, zie config.py) -- peak_import_kw is dus weer per
+#   kalendermaand, net als de eerdere versie, maar nu met een eerlijk
+#   benoemd tariefveld (monthly_peak_tariff_eur_per_kw) in plaats van een
+#   verkeerd begrepen "overshoot penalty" of "GTV-tarief."
 
 import pandas as pd
 import pyomo.environ as pyo
@@ -38,31 +56,38 @@ from bess_office.config import BatteryConfig, GridTariffConfig
 def run_lp_dispatch(
     pv_kwh: pd.Series,
     load_kwh: pd.Series,
-    prices_eur_mwh: pd.Series, #waar komt dit vandaan
+    prices_eur_mwh: pd.Series,
     battery: BatteryConfig,
-    grid_tariff: GridTariffConfig,   # deze klopt niet is nog niet ingevuld in config.py
-    timestep_hours: float,   
+    grid_tariff: GridTariffConfig,
+    timestep_hours: float,
 ) -> pd.DataFrame:
     """
     Solve a single linear program for battery dispatch over the full
-    horizon, minimizing total cost (energy + peak/capacity).
+    horizon, minimizing total cost (energy + transport + monthly peak).
 
     Parameters
     ----------
     pv_kwh, load_kwh : pd.Series
         Same units/index requirements as dispatch_sim.py's
-        run_baseline_dispatch -- energy in kWh per timestep.
+        run_baseline_dispatch -- energy in kWh per timestep. These are
+        FIXED inputs, not decision variables: the LP never reshapes
+        load or PV, it only decides charge/discharge/import/export
+        around them.
     prices_eur_mwh : pd.Series
         Day-ahead prices, same index as pv_kwh/load_kwh.
     battery : BatteryConfig
         Same battery model as V1. Note: asymmetric charge/discharge
-        power (see ASSUMPTIONS.md) is not yet split into separate
+        power (BAT-7, see ASSUMPTIONS.md) is not yet split into separate
         limits here -- power_kw is still used for both directions.
     grid_tariff : GridTariffConfig
-        contracted_capacity_tariff_eur_per_kw must be set (not None --
-        see the TODO in config.py). This is EUR per kW of peak import;
-        the LP minimizes this jointly with energy cost, so the
-        "threshold" is a model output, not an input, unlike V1.
+        Two components used here (see config.py docstring for the full
+        picture and what is deliberately left out):
+        - transport_tariff_eur_per_kwh: EUR per kWh of grid import.
+        - monthly_peak_tariff_eur_per_kw: EUR per kW of the highest
+          import in a calendar month, charged separately per month
+          (Liander's "kW max. mnd" component). The GTV/annual-contract
+          component is NOT modeled here.
+        Both must be set (not None).
     timestep_hours : float
         Length of each timestep, e.g. 0.25 for quarter-hour data.
 
@@ -76,16 +101,28 @@ def run_lp_dispatch(
         raise ValueError(
             "pv_kwh, load_kwh and prices_eur_mwh must share the same index."
         )
-    if grid_tariff.contracted_capacity_tariff_eur_per_kw is None:
+    if grid_tariff.transport_tariff_eur_per_kwh is None:
         raise ValueError(
-            "grid_tariff.contracted_capacity_tariff_eur_per_kw is still None "
+            "grid_tariff.transport_tariff_eur_per_kwh is still None "
+            "-- fill in a real tariff (see config.py TODO) before running the LP."
+        )
+    if grid_tariff.monthly_peak_tariff_eur_per_kw is None:
+        raise ValueError(
+            "grid_tariff.monthly_peak_tariff_eur_per_kw is still None "
             "-- fill in a real tariff (see config.py TODO) before running the LP."
         )
 
     timestamps = list(pv_kwh.index)
-    prices_eur_kwh = (prices_eur_mwh / 1000).to_numpy() #/1000 is for converting MWh to kWh
+    prices_eur_kwh = (prices_eur_mwh / 1000).to_numpy()  # EUR/MWh -> EUR/kWh
     pv = pv_kwh.to_numpy()
     load = load_kwh.to_numpy()
+
+    # Kalendermaand per tijdstap, voor de maandpiek-constraint. timestamps
+    # zijn al tz-aware Europe/Amsterdam (zie ASSUMPTIONS.md DATA-1), dus dit
+    # volgt lokale kloktijd, niet UTC -- consistent met hoe het tarief in
+    # werkelijkheid wordt afgerekend.
+    months = pd.Series(timestamps).dt.to_period("M").astype(str)
+    unique_months = sorted(months.unique())
 
     min_soc = battery.min_soc_fraction * battery.capacity_kwh
     max_soc = battery.max_soc_fraction * battery.capacity_kwh
@@ -94,6 +131,7 @@ def run_lp_dispatch(
 
     model = pyo.ConcreteModel()
     model.T = pyo.RangeSet(0, len(timestamps) - 1)
+    model.M = pyo.Set(initialize=unique_months)
 
     # Decision variables
     model.charge = pyo.Var(model.T, bounds=(0, max_energy_per_step))
@@ -101,13 +139,15 @@ def run_lp_dispatch(
     model.soc = pyo.Var(model.T, bounds=(min_soc, max_soc))
     model.grid_import = pyo.Var(model.T, bounds=(0, None))
     model.grid_export = pyo.Var(model.T, bounds=(0, None))
-    # "Geoptimaliseerde peak-drempel" (ASSUMPTIONS.md) -- geen vaste
-    # input, de solver kiest zelf de kostenminimaliserende piek.
-    model.peak_import_kw = pyo.Var(bounds=(0, None))
+    # Eén piek-variabele per kalendermaand -- modelleert Liander's "kW max.
+    # mnd"-component (zie config.py). Geen floor tegen een gecontracteerd
+    # vermogen: die GTV-component is in dit vereenvoudigde model niet
+    # meegenomen.
+    model.peak_import_kw = pyo.Var(model.M, bounds=(0, None))
 
     def soc_rule(m, t):
         prev_soc = initial_soc if t == 0 else m.soc[t - 1]
-        # laadverlies zit alleen bij het laden (ASSUMPTIONS.md, Batterij) BAT-2
+        # laadverlies zit alleen bij het laden (ASSUMPTIONS.md BAT-2)
         return m.soc[t] == prev_soc + m.charge[t] * battery.round_trip_efficiency - m.discharge[t]
 
     model.soc_dynamics = pyo.Constraint(model.T, rule=soc_rule)
@@ -119,17 +159,21 @@ def run_lp_dispatch(
     model.energy_balance = pyo.Constraint(model.T, rule=balance_rule)
 
     def peak_rule(m, t):
-        # peak_import_kw moet minstens elke import zijn -- de solver
-        # drukt 'm zo laag mogelijk, want hij kost geld in de objective.
-        return m.peak_import_kw >= m.grid_import[t] / timestep_hours
+        # peak_import_kw van de maand waar tijdstap t in valt moet minstens
+        # deze import zijn -- de solver drukt 'm zo laag mogelijk per maand,
+        # want elke maand kost apart geld in de objective.
+        month = months.iloc[t]
+        return m.peak_import_kw[month] >= m.grid_import[t] / timestep_hours
 
     model.peak_constraint = pyo.Constraint(model.T, rule=peak_rule)
 
     def objective_rule(m):
         energy_cost = sum(
-            (m.grid_import[t] - m.grid_export[t]) * prices_eur_kwh[t] for t in m.T
+            (m.grid_import[t] - m.grid_export[t]) * prices_eur_kwh[t]
+            + m.grid_import[t] * grid_tariff.transport_tariff_eur_per_kwh
+            for t in m.T
         )
-        peak_cost = m.peak_import_kw * grid_tariff.contracted_capacity_tariff_eur_per_kw 
+        peak_cost = sum(m.peak_import_kw[month] for month in m.M) * grid_tariff.monthly_peak_tariff_eur_per_kw
         return energy_cost + peak_cost
 
     model.objective = pyo.Objective(rule=objective_rule, sense=pyo.minimize)
@@ -161,33 +205,46 @@ def run_lp_dispatch(
 
 
 if __name__ == "__main__":
-    # Kleine, synthetische test -
-    # eigen __main__-blok: losse logica-check met kleine, verifieerbare
-    # data, geen echte databronnen x
+    # Kleine, synthetische test -- eigen __main__-blok: losse logica-check
+    # met kleine, verifieerbare data, geen echte databronnen. Dekt meerdere
+    # maanden, anders test je de maandpiek-logica niet zinnig.
     import numpy as np
 
-    hours = pd.date_range("2023-06-01", periods=24, freq="1h")
-    pv = pd.Series(
-        np.clip(5 * np.sin((hours.hour - 6) / 12 * np.pi), 0, None), index=hours
+    hours = pd.date_range("2023-06-25", periods=24 * 10, freq="1h", tz="Europe/Amsterdam")
+    hour_of_day = hours.hour.to_numpy()
+    day_pattern = np.clip(5 * np.sin((hour_of_day - 6) / 12 * np.pi), 0, None)
+    pv = pd.Series(day_pattern, index=hours)
+
+    load_pattern = np.array(
+        [2, 2, 2, 2, 2, 3, 5, 6, 4, 3, 3, 3, 3, 3, 3, 4, 6, 7, 6, 4, 3, 2, 2, 2]
     )
-    load = pd.Series(
-        [2, 2, 2, 2, 2, 3, 5, 6, 4, 3, 3, 3, 3, 3, 3, 4, 6, 7, 6, 4, 3, 2, 2, 2],
-        index=hours,
+    load = pd.Series(np.tile(load_pattern, 10), index=hours)
+
+    rng = np.random.default_rng(seed=0)
+    price_pattern = np.array(
+        [50, 48, 45, 44, 45, 50, 70, 90, 80, 60, 55, 50,
+         48, 50, 55, 65, 100, 120, 95, 70, 60, 55, 52, 50]
     )
     prices = pd.Series(
-        [50, 48, 45, 44, 45, 50, 70, 90, 80, 60, 55, 50,
-         48, 50, 55, 65, 100, 120, 95, 70, 60, 55, 52, 50],
-        index=hours,
+        np.tile(price_pattern, 10) + rng.normal(0, 3, 24 * 10), index=hours
     )
 
     battery = BatteryConfig(capacity_kwh=10, power_kw=5)
-    grid_tariff = GridTariffConfig(contracted_capacity_tariff_eur_per_kw=5.0)
+    grid_tariff = GridTariffConfig(
+        transport_tariff_eur_per_kwh=0.02,       # placeholder, NIET een echt Liander-tarief
+        monthly_peak_tariff_eur_per_kw=5.0,      # placeholder, NIET een echt Liander-tarief
+    )
 
     result = run_lp_dispatch(pv, load, prices, battery, grid_tariff, timestep_hours=1.0)
     print(result)
 
-    energy_cost = (result["grid_import_kwh"] - result["grid_export_kwh"]) * prices.values / 1000
-    peak_kw = (result["grid_import_kwh"] / 1.0).max()
-    print(f"\nPiek-import: {peak_kw:.2f} kW")
-    print(f"Energiekosten: €{energy_cost.sum():.2f}")
-    print(f"Piekkosten:    €{peak_kw * grid_tariff.contracted_capacity_tariff_eur_per_kw:.2f}")
+    energy_cost = (
+        (result["grid_import_kwh"] - result["grid_export_kwh"]) * prices.values / 1000
+        + result["grid_import_kwh"] * grid_tariff.transport_tariff_eur_per_kwh
+    )
+    monthly_peak = (result["grid_import_kwh"] / 1.0).groupby(result.index.to_period("M")).max()
+    peak_cost = monthly_peak.sum() * grid_tariff.monthly_peak_tariff_eur_per_kw
+
+    print(f"\nPiek-import per maand (kW):\n{monthly_peak}")
+    print(f"\nEnergie- + transportkosten: €{energy_cost.sum():.2f}")
+    print(f"Piekkosten (alle maanden):  €{peak_cost:.2f}")

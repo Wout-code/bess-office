@@ -75,32 +75,56 @@ class SimConfig:
 class DispatchConfig:
     """Rule-based dispatch (dispatch_sim.py) specific settings."""
     peak_threshold_kw: float = 99.4
-    
 
 
 @dataclass
 class GridTariffConfig:
     """
-    Netbeheerder-transportkosten, opgesplitst per component.
-    Structuur bevestigd (grootverbruik >3x80A): 3 aparte componenten.
-    TODO: alle waarden zijn nog placeholders (None) -- opzoeken bij een
-    echte netbeheerder-tarieventabel (Liander/Stedin/Enexis) voordat
-    optimize.py hiermee gaat rekenen. Tarieven verschillen per netbeheerder.
-    Let op: bij ~99,4 kW piek/aansluiting is de relevante deelmarkt
-    waarschijnlijk niet meer "LS t/m 50kW" (eerder opgezocht) maar een
-    hogere deelmarkt (MS/LS 50-136kW oid) -- opnieuw opzoeken.
+    Netbeheerder-transportkosten -- BEWUST VEREENVOUDIGD, zie onder.
+
+    Liander's werkelijke tariefstructuur voor grootverbruik (geverifieerd
+    tegen "tarieven voor aansluiting en transport elektriciteit 2026",
+    deelmarkt MS/LS > 50 t/m 136 kW, van toepassing op ~99,4 kW) bevat TWEE
+    aparte capaciteitscomponenten:
+      1. "kW contract" -- jaarlijks GTV-tarief over je gecontracteerde
+         vermogen; overschrijding verhoogt je GTV automatisch voor het hele
+         kalenderjaar (geen apart boetetarief).
+      2. "kW max. mnd" -- een LOS tarief, elke maand opnieuw berekend over
+         de hoogste gemeten piek die maand, onafhankelijk van je GTV.
+
+    VEREENVOUDIGING (bewust, om het model nu werkend te krijgen): dit
+    bestand modelleert alleen component 2 (de maandelijkse piek). Component
+    1 (GTV/jaarlijkse overschrijding) wordt NIET meegenomen -- behandeld als
+    een vaste, niet-dispatch-afhankelijke kost, voorlopig buiten scope.
+    optimize.py minimaliseert dus alleen de som van de 12 maandpieken × het
+    maandtarief, niet de volledige Liander-kostenstructuur.
+
+    TODO, in volgorde:
+    - De onderstaande getallen zijn SCHATTINGEN uit een AI-samenvatting van
+      de Liander-PDF, NIET handmatig geverifieerd -- twee pogingen gaven
+      onderling inconsistente cijfers voor dezelfde deelmarkt. Controleer
+      zelf de exacte tabel in:
+      https://www.liander.nl/-/media/files/tarieven/grootzakelijk/tarieven-2026/tarieven-voor-aansluiting-en-transport-elektriciteit-2026_2.pdf
+    - Zodra geverifieerd: component 1 (GTV) alsnog toevoegen aan het model
+      (zie de oudere versie van dit bestand / het overzicht-document voor
+      hoe dat eruitzag: een peak_floor-constraint op een jaarlijkse piek).
     """
-    # 1. Transporttarief: over het totale jaarvolume, kWh -- geen piek-relatie, deze word wel gebruikt in de optimalisatie
-    transport_tariff_eur_per_kwh: float | None = None
+    # Component: transporttarief over het totale jaarvolume, kWh -- geen
+    # piek-relatie. SCHATTING, niet geverifieerd: €0,0226/kWh (deelmarkt
+    # MS/LS > 50 t/m 136 kW).
+    transport_tariff_eur_per_kwh: float | None = 0.0226
 
-    # 2. Gecontracteerd transportvermogen (GTV): vaste, gekozen grens (kW) deze word niet gebruikt in de optimalisatie
-    #    en de vaste prijs die je daarvoor betaalt, ongeacht werkelijk gebruik
+    # Component: "kW max. mnd" -- tarief per kW van de hoogste gemeten
+    # piek in een kalendermaand. Dit is het enige capaciteitstarief dat
+    # optimize.py momenteel gebruikt. SCHATTING, niet geverifieerd:
+    # €3,57/kW/maand (deelmarkt MS/LS > 50 t/m 136 kW).
+    monthly_peak_tariff_eur_per_kw: float | None = 3.57
+
+    # Niet gebruikt in het huidige vereenvoudigde model -- bewaard voor
+    # wanneer component 1 (GTV/jaarlijkse overschrijding) wordt toegevoegd.
+    # SCHATTING, niet geverifieerd: €3,74/kW/maand voor het GTV-tarief.
     contracted_capacity_kw: float | None = None
-    contracted_capacity_tariff_eur_per_kw: float | None = None
-
-    # 3. Boetetarief bij overschrijding van de gecontracteerde piek -- deze word wel gebruikt in de optimalisatie
-    #    dit is de term die optimize.py's doelfunctie zal gebruiken
-    overshoot_penalty_eur_per_kw: float | None = None
+    contracted_capacity_tariff_eur_per_kw: float | None = 3.74
 
 
 @dataclass
