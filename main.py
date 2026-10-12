@@ -1,11 +1,15 @@
-"""End-to-end baseline dispatch run, using real PV, load, and price data.
+"""End-to-end baseline + LP dispatch run, using real PV, load, and price data.
 
-Unlike dispatch_sim.py's own __main__ block (which tests the dispatch
-RULES against small, synthetic, hand-verifiable data), this script
-runs the REAL pipeline: fetch actual PV generation, actual building
+Unlike dispatch_sim.py's and optimize.py's own __main__ blocks (which test
+the dispatch RULES/LP against small, synthetic, hand-verifiable data), this
+script runs the REAL pipeline: fetch actual PV generation, actual building
 consumption, and actual day-ahead prices, align them to a common
-quarter-hour resolution, simulate dispatch, and translate the result
-to EUR -- runnable directly from the terminal with `uv run main.py`.
+quarter-hour resolution, run BOTH dispatch methods, and translate the
+results to EUR -- runnable directly from the terminal with `uv run main.py`.
+
+This is Fase 1's deliverable (zie ROADMAP.md): een kwantitatieve
+vergelijking tussen de regelgebaseerde baseline (RBC, dispatch_sim.py) en
+de LP-optimalisatie (optimize.py), op zowel piekreductie als euro's.
 """
 
 import pandas as pd
@@ -15,22 +19,69 @@ from bess_office.dispatch_sim import compute_dispatch_metrics, run_baseline_disp
 from bess_office.fetch_load import derive_peak_kwh_per_quarter, get_relative_profile
 from bess_office.fetch_prices import get_day_ahead_prices
 from bess_office.fetch_pv import get_pv_profile
+from bess_office.optimize import run_lp_dispatch
 
 
-def compute_financial_metrics(result: pd.DataFrame, prices_eur_mwh: pd.Series) -> dict:
-    """Translate the dispatch result (kWh) into EUR, as a separate step
-    AFTER the dispatch itself -- dispatch_sim.py stays kWh-only by
-    design (see ASSUMPTIONS.md, Architectuur)."""
+def compute_financial_metrics(
+    result: pd.DataFrame, prices_eur_mwh: pd.Series, grid_tariff, timestep_hours: float
+) -> dict:
+    """Translate a dispatch result (kWh) into EUR -- as a separate step
+    AFTER the dispatch itself (dispatch_sim.py and optimize.py both stay
+    kWh-only by design, see ASSUMPTIONS.md Architectuur).
+
+    Rekent dezelfde drie kostencomponenten als optimize.py's objective
+    (energie, transport, maandpiek -- zie config.py GridTariffConfig voor
+    waarom het bij twee componenten + maandpiek is gebleven, GTV
+    bewust buiten scope), zodat de baseline en de LP op een EERLIJKE,
+    identieke kostenformule vergeleken worden. Werkt voor het resultaat
+    van ZOWEL run_baseline_dispatch als run_lp_dispatch -- beide geven
+    dezelfde kolommen terug.
+    """
     prices_eur_kwh = prices_eur_mwh / 1000  # ENTSO-E levert EUR/MWh
 
-    import_cost = (result["grid_import_kwh"] * prices_eur_kwh).sum()    # ARCH-5
+    import_cost = (result["grid_import_kwh"] * prices_eur_kwh).sum()  # ARCH-5
     export_revenue = (result["grid_export_kwh"] * prices_eur_kwh).sum()
+    transport_cost = result["grid_import_kwh"].sum() * grid_tariff.transport_tariff_eur_per_kwh
+
+    # Maandpiek-kost: zelfde formule als optimize.py's objective (Liander's
+    # "kW max. mnd"-component, zie config.py GridTariffConfig-docstring).
+    peak_import_kw_per_step = result["grid_import_kwh"] / timestep_hours
+    monthly_peak_kw = peak_import_kw_per_step.groupby(result.index.to_period("M")).max()
+    peak_cost = monthly_peak_kw.sum() * grid_tariff.monthly_peak_tariff_eur_per_kw
 
     return {
-        "import_cost_eur": import_cost,   
+        "import_cost_eur": import_cost,
         "export_revenue_eur": export_revenue,
-        "net_cost_eur": import_cost - export_revenue,
+        "transport_cost_eur": transport_cost,
+        "peak_cost_eur": peak_cost,
+        "net_cost_eur": import_cost + transport_cost + peak_cost - export_revenue,
+        "monthly_peak_kw": monthly_peak_kw,
     }
+
+
+def print_dispatch_report(label: str, result: pd.DataFrame, metrics: dict, financials: dict) -> None:
+    """Print one dispatch method's results, with the method's name in
+    every header -- zonder dat label is niet te zien of een getal bij de
+    RBC-baseline of de LP-optimalisatie hoort zodra er twee resultaten
+    naast elkaar staan."""
+    print(f"=== {label} ===")
+    print(f"Peak without battery: {metrics['peak_import_no_battery_kw']:.2f} kW")
+    print(f"Peak with battery ({label}): {metrics['peak_import_with_battery_kw']:.2f} kW")
+    print(f"Peak shaved ({label}):       {metrics['peak_shaved_kw']:.2f} kW ({metrics['peak_shaved_pct']:.0f}%)")
+    print()
+    print(f"Self-consumption (no battery):        {metrics['self_consumption_no_battery_pct']:.0f}%")
+    print(f"Self-consumption ({label}): {metrics['self_consumption_pct']:.0f}%")
+    print(f"Self-consumption gain ({label}):       +{metrics['self_consumption_gain_pct']:.0f} pp")
+    print()
+    print(f"Total grid import ({label}): {result['grid_import_kwh'].sum():.2f} kWh")
+    print(f"Total grid export ({label}): {result['grid_export_kwh'].sum():.2f} kWh")
+    print()
+    print(f"Import cost ({label}):     €{financials['import_cost_eur']:.2f}")
+    print(f"Export revenue ({label}):  €{financials['export_revenue_eur']:.2f}")
+    print(f"Transport cost ({label}):  €{financials['transport_cost_eur']:.2f}")
+    print(f"Peak/capacity cost ({label}): €{financials['peak_cost_eur']:.2f}")
+    print(f"Net cost ({label}):        €{financials['net_cost_eur']:.2f}")
+    print()
 
 
 def main() -> None:
@@ -79,37 +130,58 @@ def main() -> None:
 
     surplus = pv_quarter - load
 
-    result = run_baseline_dispatch(
+    print(f"Gebruikt peak_kwh_per_quarter: {peak_kwh_per_quarter:.2f} kWh "
+          f"(uit {CONFIG.building.area_m2:.0f} m2 x {CONFIG.building.annual_kwh_per_m2:.0f} kWh/m2/jaar)")
+    print(f"Momenten met PV-overschot: {(surplus > 0).sum()} van {len(surplus)}")
+    print()
+
+    # --- RBC (Rule-Based Control): regelgebaseerde baseline, dispatch_sim.py ---
+    rbc_result = run_baseline_dispatch(
         pv_quarter,
         load,
         CONFIG.battery,
         peak_threshold_kw=CONFIG.dispatch.peak_threshold_kw,
         timestep_hours=CONFIG.sim.timestep_hours,
     )
+    rbc_metrics = compute_dispatch_metrics(rbc_result, peak_threshold_kw=CONFIG.dispatch.peak_threshold_kw)
+    rbc_financials = compute_financial_metrics(
+        rbc_result, prices_quarter, CONFIG.grid_tariff, CONFIG.sim.timestep_hours
+    )
+    print_dispatch_report("RBC (baseline)", rbc_result, rbc_metrics, rbc_financials)
 
-    metrics = compute_dispatch_metrics(result, peak_threshold_kw=CONFIG.dispatch.peak_threshold_kw)
-    financials = compute_financial_metrics(result, prices_quarter)
+    # --- LP-optimalisatie: optimize.py. LET OP: dit lost een LP op over de
+    # volledige jaarhorizon op kwartier-resolutie (~35.000 tijdstappen) --
+    # dit kan een paar minuten duren, afhankelijk van je CBC-installatie.
+    lp_result = run_lp_dispatch(
+        pv_quarter,
+        load,
+        prices_quarter,
+        CONFIG.battery,
+        CONFIG.grid_tariff,
+        timestep_hours=CONFIG.sim.timestep_hours,
+    )
+    # compute_dispatch_metrics is dispatch-methode-agnostisch (kijkt alleen
+    # naar de kolommen pv_kwh/load_kwh/grid_import_kwh/grid_export_kwh),
+    # dus herbruikbaar voor het LP-resultaat. peak_threshold_kw hier is
+    # puur een beschrijvende metriek (hoeveel reductie t.o.v. die drempel),
+    # niet iets waar de LP zelf tegen optimaliseert.
+    lp_metrics = compute_dispatch_metrics(lp_result, peak_threshold_kw=CONFIG.dispatch.peak_threshold_kw)
+    lp_financials = compute_financial_metrics(
+        lp_result, prices_quarter, CONFIG.grid_tariff, CONFIG.sim.timestep_hours
+    )
+    print_dispatch_report("LP-optimalisatie", lp_result, lp_metrics, lp_financials)
 
-    print(f"Gebruikt peak_kwh_per_quarter: {peak_kwh_per_quarter:.2f} kWh "
-          f"(uit {CONFIG.building.area_m2:.0f} m2 x {CONFIG.building.annual_kwh_per_m2:.0f} kWh/m2/jaar)")
-    print()
-    print(result.head())
-    print()
-    print(f"Peak without battery: {metrics['peak_import_no_battery_kw']:.2f} kW")
-    print(f"Peak with battery:    {metrics['peak_import_with_battery_kw']:.2f} kW")
-    print(f"Peak shaved:          {metrics['peak_shaved_kw']:.2f} kW ({metrics['peak_shaved_pct']:.0f}%)")
-    print()
-    print(f"Self-consumption (no battery):   {metrics['self_consumption_no_battery_pct']:.0f}%")
-    print(f"Self-consumption (with battery): {metrics['self_consumption_pct']:.0f}%")
-    print(f"Self-consumption gain:           +{metrics['self_consumption_gain_pct']:.0f} pp")
-    print()
-    print(f"Total grid import: {result['grid_import_kwh'].sum():.2f} kWh")
-    print(f"Total grid export: {result['grid_export_kwh'].sum():.2f} kWh")
-    print()
-    print(f"Import cost:    €{financials['import_cost_eur']:.2f}")
-    print(f"Export revenue: €{financials['export_revenue_eur']:.2f}")
-    print(f"Net cost:       €{financials['net_cost_eur']:.2f}")
-    print(f"Momenten met PV-overschot: {(surplus > 0).sum()} van {len(surplus)}")
+    # --- Vergelijking: dit is het eigenlijke Fase 1-deliverable ---
+    print("=== Vergelijking RBC vs. LP ===")
+    cost_savings = rbc_financials["net_cost_eur"] - lp_financials["net_cost_eur"]
+    cost_savings_pct = (
+        100 * cost_savings / rbc_financials["net_cost_eur"] if rbc_financials["net_cost_eur"] else 0.0
+    )
+    print(
+        f"Piekreductie LP t.o.v. RBC: "
+        f"{rbc_metrics['peak_import_with_battery_kw'] - lp_metrics['peak_import_with_battery_kw']:.2f} kW"
+    )
+    print(f"Kostenbesparing LP t.o.v. RBC: €{cost_savings:.2f} ({cost_savings_pct:.1f}%)")
 
 
 if __name__ == "__main__":
