@@ -140,6 +140,15 @@ rekenmodel je gebruikt.
   zodra dit naar een meerjarige projectie gaat — LET OP: deze garantie
   hoort bij de oude SigenStor-keuze; nog te verifiëren voor de BOLT-241,
   zie DATA-9)
+  Degradatie zit daarom ook bewust **niet** in de LP-objective (geen
+  cycluskost). Onderbouwing: gemeten equivalente volle cycli/jaar
+  (`main.py`, 2023-data) zijn RBC 102, LP scenario A 487 (1,33/dag), LP
+  scenario B 264. Dat staat tegenover ≥ 6000 cycli voor de BOLT-241 (opgave,
+  niet geverifieerd, zie DATA-9): zelfs bij 487/jaar ~12 jaar. Bovendien
+  is de C-rate 99 kW / 241 kWh ≈ 0,41C, een mild regime waarin
+  kalenderveroudering domineert over cyclusstress (insights.md, Wang et
+  al. 2011). Een cycluskost in de objective is een mogelijke uitbreiding,
+  niet geïmplementeerd.
 - **BAT-4** — Geen minimale aan/uit-tijd — batterij schakelt vrij
 - **BAT-5** — Efficiëntie/capaciteit constant, ongeacht SoC, laadsnelheid
   of temperatuur
@@ -185,21 +194,53 @@ van correcte fysica of betere parameters.
 ## Gedeeld tussen beide bestanden in V2
 
 **Batterij**
-- **BAT-7** — Asymmetrisch laad-/ontlaadvermogen — corrigeert BAT-1;
-  fysiek feit, geen V1-vereenvoudiging meer, dus geldt voor beide bestanden
+- **BAT-7** — Asymmetrisch laad-/ontlaadvermogen — corrigeert BAT-1.
+  **Gepland, nog niet geïmplementeerd**: beide bestanden gebruiken nog
+  `power_kw` voor laden én ontladen, BAT-1 is dus feitelijk nog van kracht.
 - BAT-2 t/m BAT-6 blijven ongewijzigd van kracht
 
 **Markt/Net**
 - **NET-4** — Geoptimaliseerde peak-drempel i.p.v. vaste jaardrempel —
-  corrigeert NET-1; in `optimize.py` intern berekend, in
-  `dispatch_sim.py` als vooraf berekende parameter ingevoerd, de regel
-  zelf blijft reactief
+  corrigeert NET-1. In `optimize.py` intern: één piekvariabele per
+  kalendermaand. In `dispatch_sim.py` blijft het één drempel voor het hele
+  jaar, maar die wordt niet meer met de hand gekozen: `main.py`
+  (`select_rbc_threshold`) scant 50–98 kW in stappen van 2 kW
+  (`DispatchConfig.threshold_scan_*`) en kiest de drempel met de laagste
+  jaarlijkse netto kosten (2023: 52 kW). Prijzen komen alleen in die scan
+  voor, de regel zelf blijft prijsloos en reactief (ARCH-1, TIME-1). Let
+  op: dit is een ex-post keuze op hetzelfde jaar (in-sample), dus gunstig
+  voor de RBC.
+- **NET-5** — Energiebelasting als vast tarief per geïmporteerde kWh
+  (`GridTariffConfig.energy_tax_eur_per_kwh = 0,03735`): de marginale schijf
+  50.000–10 mln kWh, 2026-tarief excl. btw, toegepast op 2023-prijzen.
+  Alleen op import, geen saldering (grootverbruik). Zit zowel in de
+  LP-objective als in `compute_financial_metrics`. De hogere tarieven van de
+  eerste 50.000 kWh zijn niet gemodelleerd: dat is een vaste kost, niet
+  beslissingsrelevant.
+- **NET-6** — Scenario B: hypothetische dubbele energiebelasting op opslag,
+  nog eens 0,03735 EUR per kWh die de batterij in gaat
+  (`storage_charge_tax_eur_per_kwh`, default 0,0 = scenario A). Gebaseerd op
+  de discussie over dubbele energiebelasting bij opslag, die in
+  werkelijkheid vooral speelt achter kleinverbruikersaansluitingen. Het is
+  een bovengrens, want ook PV-laden (alle `charge_kwh`) wordt belast. De
+  LP wordt voor B opnieuw opgelost; de RBC-dispatch is prijsloos en blijft
+  gelijk, alleen zijn kosten worden herberekend.
 - Zie ARCH-5 (bij V1 — Architectuur) voor export/import symmetrisch
   geprijsd — geldt identiek voor V2, geen apart NET-ID nodig.
 - NET-2, NET-3 blijven ongewijzigd van kracht
 
 **Architectuur**
-- **ARCH-3** — Grid-charging wordt mogelijk — corrigeert ARCH-2
+- **ARCH-3** — Grid-charging wordt mogelijk — corrigeert ARCH-2.
+  Geïmplementeerd in beide bestanden. `optimize.py`: vrij, de solver
+  beslist. `dispatch_sim.py`: standaard peak-shaving-regel — zolang de
+  import (kW) onder de drempel blijft, laden vanaf het net met hooguit de
+  resterende ruimte tot de drempel, begrensd door `power_kw` (minus wat al
+  van PV geladen wordt) en max SoC, met hetzelfde laadverlies als PV-laden
+  (BAT-2). Bijeffect: de RBC-zelfconsumptie daalt (2023, drempel 52 kW: 83,1%
+  zonder vs. 78,6% met grid-charging; zonder batterij 78,3%), omdat de
+  batterij vaker vol is als er PV-overschot komt (gedeelde SoC, zie
+  insights.md). Ook de netto kosten van de RBC zijn bij dezelfde drempel iets
+  hoger met grid-charging (€63.558 vs. €63.300).
 
 ## dispatch_sim.py specifiek (blijft regelgebaseerd)
 
@@ -223,9 +264,20 @@ van correcte fysica of betere parameters.
 
 **Batterij**
 - **BAT-8** — Aangenomen dat laden en ontladen nooit tegelijk gebeuren
-  omdat de solver altijd de efficiëntste oplossing kiest — **nog niet
-  gecontroleerd of dit ook klopt bij negatieve prijzen** (NL day-ahead
-  gaat af en toe negatief). Check: `df[df["price"] < 0]` op je prijsdata.
+  omdat de solver altijd de efficiëntste oplossing kiest. **Gecontroleerd
+  (2023-data): klopt niet bij negatieve prijzen.** Scenario A: 399 van de
+  35.032 kwartieren met gelijktijdig laden en ontladen, allemaal bij een
+  negatieve prijs (1.256 kwartieren < 0). Daarbij gaat 546 kWh aan
+  laadverlies verloren; zelfs gewaardeerd tegen de laagste prijs
+  (−500 EUR/MWh) is dat hooguit ~€270/jaar, ~3% van de LP-besparing.
+  Scenario B: 16 kwartieren, ook allemaal bij een negatieve prijs. Bewust
+  niet opgelost met binaries (LP, geen MILP, zie insights.md); het effect is
+  financieel klein en zichtbaar gerapporteerd.
+- **BAT-9** — Eind-SoC ≥ begin-SoC (`initial_soc_fraction`) aan het eind
+  van de horizon. Zonder deze voorwaarde trekt de LP de batterij aan het
+  eind gratis leeg en telt die energie als besparing. De RBC heeft deze
+  voorwaarde niet (2023: eindigt op 208,8 kWh vs. 120,5 kWh begin, een
+  klein nadeel voor de RBC).
 
 ## Belangrijke context, geen aanname
 
