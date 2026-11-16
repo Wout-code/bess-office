@@ -89,10 +89,12 @@ def run_baseline_dispatch(
 
         else:
             deficit = -surplus
-            if deficit > peak_threshold_kw:
+            # deficit is kWh per tijdstap, de drempel is kW -- expliciet
+            # omrekenen (zie CLAUDE.md, Eenheden).
+            if deficit / timestep_hours > peak_threshold_kw:
                 # Peak shaving: discharge to bring import down to the
                 # threshold, limited by power rating and available SoC.
-                shave_target = deficit - peak_threshold_kw
+                shave_target = deficit - peak_threshold_kw * timestep_hours
                 available_energy = soc - min_soc
                 discharge = min(shave_target, max_energy_per_step, available_energy)
                 soc -= discharge
@@ -119,11 +121,32 @@ def run_baseline_dispatch(
     return pd.DataFrame(records).set_index("timestamp")
 
 
-def compute_dispatch_metrics(result: pd.DataFrame, peak_threshold_kw: float) -> dict:
-    """... (docstring ongewijzigd, alleen Returns-sectie uitbreiden) ..."""
+def compute_dispatch_metrics(
+    result: pd.DataFrame, peak_threshold_kw: float, timestep_hours: float
+) -> dict:
+    """
+    Summarize a dispatch result: peak import with/without battery and
+    PV self-consumption.
+
+    Parameters
+    ----------
+    result : pd.DataFrame
+        Output of run_baseline_dispatch or run_lp_dispatch (kWh per timestep).
+    peak_threshold_kw : float
+        Threshold used for the run; only echoed back, descriptive.
+    timestep_hours : float
+        Length of each timestep in hours, used to convert peak energy per
+        timestep (kWh) into power (kW).
+
+    Returns
+    -------
+    dict
+        Peaks in kW (``*_kw``), self-consumption in percent (``*_pct``).
+    """
     naive_import = (result["load_kwh"] - result["pv_kwh"]).clip(lower=0)
-    peak_no_battery = naive_import.max()
-    peak_with_battery = result["grid_import_kwh"].max()
+    # kWh per tijdstap -> kW
+    peak_no_battery = naive_import.max() / timestep_hours
+    peak_with_battery = result["grid_import_kwh"].max() / timestep_hours
     peak_shaved = peak_no_battery - peak_with_battery
     peak_shaved_pct = 100 * peak_shaved / peak_no_battery if peak_no_battery > 0 else 0.0
 
@@ -173,7 +196,7 @@ if __name__ == "__main__":
 
     print(result)
 
-    metrics = compute_dispatch_metrics(result, peak_threshold_kw=peak_threshold_kw)
+    metrics = compute_dispatch_metrics(result, peak_threshold_kw=peak_threshold_kw, timestep_hours=1.0)
     print(f"\nPeak without battery: {metrics['peak_import_no_battery_kw']:.2f} kW")
     print(f"Peak with battery:    {metrics['peak_import_with_battery_kw']:.2f} kW")
     print(f"Peak shaved:          {metrics['peak_shaved_kw']:.2f} kW ({metrics['peak_shaved_pct']:.0f}%)")

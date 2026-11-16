@@ -143,7 +143,11 @@ def main() -> None:
         peak_threshold_kw=CONFIG.dispatch.peak_threshold_kw,
         timestep_hours=CONFIG.sim.timestep_hours,
     )
-    rbc_metrics = compute_dispatch_metrics(rbc_result, peak_threshold_kw=CONFIG.dispatch.peak_threshold_kw)
+    rbc_metrics = compute_dispatch_metrics(
+        rbc_result,
+        peak_threshold_kw=CONFIG.dispatch.peak_threshold_kw,
+        timestep_hours=CONFIG.sim.timestep_hours,
+    )
     rbc_financials = compute_financial_metrics(
         rbc_result, prices_quarter, CONFIG.grid_tariff, CONFIG.sim.timestep_hours
     )
@@ -165,7 +169,11 @@ def main() -> None:
     # dus herbruikbaar voor het LP-resultaat. peak_threshold_kw hier is
     # puur een beschrijvende metriek (hoeveel reductie t.o.v. die drempel),
     # niet iets waar de LP zelf tegen optimaliseert.
-    lp_metrics = compute_dispatch_metrics(lp_result, peak_threshold_kw=CONFIG.dispatch.peak_threshold_kw)
+    lp_metrics = compute_dispatch_metrics(
+        lp_result,
+        peak_threshold_kw=CONFIG.dispatch.peak_threshold_kw,
+        timestep_hours=CONFIG.sim.timestep_hours,
+    )
     lp_financials = compute_financial_metrics(
         lp_result, prices_quarter, CONFIG.grid_tariff, CONFIG.sim.timestep_hours
     )
