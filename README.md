@@ -1,5 +1,8 @@
 # bess-office
 
+**Same battery, different control: rule-based control saves €1,066/year, optimization up to €8,264
+(upper bound). The value is in arbitrage, not peak shaving.**
+
 An open, transparent model for operating a battery (BESS) in an SME office building with a
 large-consumer grid connection (grootverbruik). At quarter-hour resolution over a full year, it compares:
 
@@ -54,11 +57,14 @@ Payback period: not yet calculated (investment costs are not in the model yet).
 ## Limitations
 
 - **Perfect foresight:** the LP result is an upper bound (TIME-2).
+- **No degradation cost:** battery wear is free in the model (BAT-3). Since wear scales mainly
+  with energy throughput, this favours the LP most: it runs 487 full cycles/year versus 102 for
+  the RBC. The LP savings are therefore optimistic on two counts: perfect foresight and free cycling.
 - **One price year, in-sample:** not tested whether other years turn out higher or lower (NET-4).
 - **Smoothed consumption profile:** an average of hundreds of buildings, so the value of peak reduction
   is probably underestimated (DATA-7).
 - **Tariffs and battery specs not verified:** all euro amounts are indicative (DATA-9).
-- **Not modeled:** contracted transport capacity (GTV), degradation cost (BAT-3), lower export price (ARCH-5), and simultaneous
+- **Not modeled:** contracted transport capacity (GTV), lower export price (ARCH-5), and simultaneous
   charging/discharging at negative prices is measured but not excluded (BAT-8, ≤ €270/year).
 
 ## Running
@@ -82,6 +88,8 @@ The key open question: how much of the €8,264 remains without perfect knowledg
 
 - **Rolling-horizon MPC:** optimize daily over 24–48 hours using forecasts.
 - **Sensitivity to noise:** savings under increasing errors in price, PV and consumption forecasts.
+- **Degradation cost:** a cost per kWh of throughput in the objective, to see how many cycles
+  and how much of the savings remain once wear is priced in.
 - **GTV and congestion:** the value of a smaller grid connection.
 - **More years:** other price years, RBC threshold out-of-sample.
 
