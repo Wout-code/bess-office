@@ -4,18 +4,18 @@ from pathlib import Path
 
 @dataclass
 class BatteryConfig:
-    # BOLT-241 (Boltainer, NL) -- corrigeert DATA-4, zie ASSUMPTIONS.md DATA-9.
-    # 241 kWh capaciteit; vermogensopties 49/60/99/120 kW, 99 kW gekozen
-    # o.b.v. de berekende piek (99,4 kW, zie derive_peak_kwh_per_quarter).
-    # LET OP: bruikbare capaciteit (na min/max SoC) en exacte round-trip
-    # efficiency van dit product zijn niet apart geverifieerd -- de
-    # onderstaande min/max_soc_fraction en round_trip_efficiency zijn nog
-    # de oude SigenStor-aannames, niet productspecifiek voor de BOLT-241.
+    # BOLT-241 (Boltainer, NL) -- corrects DATA-4, see ASSUMPTIONS.md DATA-9.
+    # 241 kWh capacity; power options 49/60/99/120 kW, 99 kW chosen
+    # based on the calculated peak (99.4 kW, see derive_peak_kwh_per_quarter).
+    # NOTE: usable capacity (after min/max SoC) and exact round-trip
+    # efficiency of this product have not been verified separately -- the
+    # min/max_soc_fraction and round_trip_efficiency below are still
+    # the old SigenStor assumptions, not product-specific for the BOLT-241.
     capacity_kwh: float = 241.0
     power_kw: float = 99.0
-    round_trip_efficiency: float = 0.90  # TODO: BOLT-241-specifiek getal opzoeken
-    min_soc_fraction: float = 0.10       # TODO: idem
-    max_soc_fraction: float = 0.95       # TODO: idem
+    round_trip_efficiency: float = 0.90  # TODO: look up BOLT-241-specific figure
+    min_soc_fraction: float = 0.10       # TODO: same
+    max_soc_fraction: float = 0.95       # TODO: same
     initial_soc_fraction: float = 0.50
 
 
@@ -23,19 +23,19 @@ class BatteryConfig:
 class PVConfig:
     latitude: float = 52.01
     longitude: float = 4.36
-    # Exportbewuste dimensionering (~33% jaardekking) -- corrigeert de
-    # oude 25 kWp, zie ASSUMPTIONS.md DATA-10. Bewust niet op volledige
-    # jaarverbruik-dekking gemikt (dat zou ~673 kWp zijn): bij grootverbruik
-    # is export structureel lager gewaardeerd dan zelfconsumptie (zie
-    # ARCH-5), dus een installatie die vooral exporteert is economisch
-    # minder efficiënt dan zijn kWp-getal doet vermoeden.
+    # Export-aware sizing (~33% annual coverage) -- corrects the
+    # old 25 kWp, see ASSUMPTIONS.md DATA-10. Deliberately not aimed at full
+    # annual consumption coverage (that would be ~673 kWp): for large consumers
+    # export is structurally valued lower than self-consumption (see
+    # ARCH-5), so an installation that mainly exports is economically
+    # less efficient than its kWp figure suggests.
     peak_power_kw: float = 190.0
     tilt: float = 12.0
     azimuth: float = 180.0
-    # 180 = zuid, geverifieerd tegen pvlib's noord-nul-conventie
-    # (noord=0, oost=90, zuid=180, west=270) sinds pvlib 0.10.0.
-    # pyproject.toml vereist pvlib>=0.15.2, dus deze waarde is correct
-    # zonder handmatige omrekening naar PVGIS' eigen (verschillende) conventie.
+    # 180 = south, verified against pvlib's north-zero convention
+    # (north=0, east=90, south=180, west=270) since pvlib 0.10.0.
+    # pyproject.toml requires pvlib>=0.15.2, so this value is correct
+    # without manual conversion to PVGIS' own (different) convention.
     mounting_place: str = "free"
     system_loss_pct: float = 14.0
     year: int = 2023
@@ -44,38 +44,38 @@ class PVConfig:
 
 @dataclass
 class BuildingConfig:
-    # Grootverbruik-schaal (>3x80A / 55 kVA), bewust gekozen -- corrigeert
-    # DATA-3, zie ASSUMPTIONS.md DATA-8.
+    # Large-consumer scale (grootverbruik, >3x80A / 55 kVA), deliberately
+    # chosen -- corrects DATA-3, see ASSUMPTIONS.md DATA-8.
     #
-    # annual_kwh_per_m2 blijft de NL-gemiddelde kantoor/onderwijs-referentie
-    # (Energy Shift, bandbreedte 100-150) -- die verandert niet met schaal.
-    # area_m2 is opgehoogd zodat de resulterende piek (via
-    # derive_peak_kwh_per_quarter() in fetch_load.py) ruim boven de 55 kVA-
-    # grens uitkomt:
+    # annual_kwh_per_m2 remains the Dutch average office/education reference
+    # (Energy Shift, range 100-150) -- that does not change with scale.
+    # area_m2 has been increased so that the resulting peak (via
+    # derive_peak_kwh_per_quarter() in fetch_load.py) ends up well above the
+    # 55 kVA threshold:
     #
-    #   som(relative_profile) op KO_KANTOOR_ONDERWIJS, geverifieerd via
-    #   get_relative_profile().sum(): 20.824,42
-    #   4.500 m2 x 115 kWh/m2/jaar = 517.500 kWh/jaar
-    #   -> peak_kwh_per_quarter = 517.500 / 20.824,42 = 24,85 kWh/kwartier
-    #   -> piek = 99,4 kW  (geverifieerd via get_relative_profile().sum())
+    #   sum(relative_profile) on KO_KANTOOR_ONDERWIJS, verified via
+    #   get_relative_profile().sum(): 20,824.42
+    #   4,500 m2 x 115 kWh/m2/year = 517,500 kWh/year
+    #   -> peak_kwh_per_quarter = 517,500 / 20,824.42 = 24.85 kWh/quarter-hour
+    #   -> peak = 99.4 kW  (verified via get_relative_profile().sum())
     area_m2: float = 4500.0
-    annual_kwh_per_m2: float = 115.0    # NL-gemiddelde, bandbreedte 100-150 (Energy Shift)
-    # peak_kwh_per_quarter staat hier bewust niet -- het is geen zuivere
-    # gebouwseigenschap (hangt ook af van de gekozen profielvorm), en wordt
-    # afgeleid in main.py via derive_peak_kwh_per_quarter().
+    annual_kwh_per_m2: float = 115.0    # Dutch average, range 100-150 (Energy Shift)
+    # peak_kwh_per_quarter is deliberately not here -- it is not a pure
+    # building property (it also depends on the chosen profile shape), and is
+    # derived in main.py via derive_peak_kwh_per_quarter().
 
 
 @dataclass
 class SimConfig:
     """Settings shared by both dispatch_sim and optimize."""
-    timestep_hours: float = 0.25  # 15-minuten voor capaciteitstarief
+    timestep_hours: float = 0.25  # 15 minutes for the capacity tariff
 
 
 @dataclass
 class DispatchConfig:
     """Rule-based dispatch (dispatch_sim.py) specific settings."""
-    # De RBC-drempel wordt niet meer vast gekozen, maar in main.py gescand op
-    # laagste jaarlijkse netto kosten (NET-4): range(min, max + 1, step).
+    # The RBC threshold is no longer fixed, but scanned in main.py for the
+    # lowest annual net cost (NET-4): range(min, max + 1, step).
     threshold_scan_min_kw: float = 50.0
     threshold_scan_max_kw: float = 99.0
     threshold_scan_step_kw: float = 2.0
@@ -84,59 +84,59 @@ class DispatchConfig:
 @dataclass
 class GridTariffConfig:
     """
-    Netbeheerder-transportkosten -- BEWUST VEREENVOUDIGD, zie onder.
+    Grid operator transport costs -- DELIBERATELY SIMPLIFIED, see below.
 
-    De tariefSTRUCTUUR komt uit de Liander-PDF "tarieven voor aansluiting
-    en transport elektriciteit 2026" (deelmarkt MS/LS > 50 t/m 136 kW, van
-    toepassing op ~99,4 kW); de GETALLEN hieronder zijn niet geverifieerd
-    (zie TODO). Volgens die PDF zijn er TWEE aparte capaciteitscomponenten:
-      1. "kW contract" -- jaarlijks GTV-tarief over je gecontracteerde
-         vermogen; overschrijding verhoogt je GTV automatisch voor het hele
-         kalenderjaar (geen apart boetetarief).
-      2. "kW max. mnd" -- een LOS tarief, elke maand opnieuw berekend over
-         de hoogste gemeten piek die maand, onafhankelijk van je GTV.
+    The tariff STRUCTURE comes from the Liander PDF "tarieven voor aansluiting
+    en transport elektriciteit 2026" (sub-market MS/LS > 50 up to and including
+    136 kW, applicable to ~99.4 kW); the NUMBERS below have not been verified
+    (see TODO). According to that PDF there are TWO separate capacity components:
+      1. "kW contract" -- annual tariff for contracted transport capacity (GTV)
+         over your contracted power; exceeding it automatically raises your GTV
+         for the entire calendar year (no separate penalty tariff).
+      2. "kW max. mnd" -- a SEPARATE tariff, recalculated every month over
+         the highest measured peak that month, independent of your GTV.
 
-    VEREENVOUDIGING (bewust, om het model nu werkend te krijgen): dit
-    bestand modelleert alleen component 2 (de maandelijkse piek). Component
-    1 (GTV/jaarlijkse overschrijding) wordt NIET meegenomen -- behandeld als
-    een vaste, niet-dispatch-afhankelijke kost, voorlopig buiten scope.
-    optimize.py minimaliseert dus alleen de som van de 12 maandpieken × het
-    maandtarief, niet de volledige Liander-kostenstructuur.
+    SIMPLIFICATION (deliberate, to get the model working now): this
+    file models only component 2 (the monthly peak). Component
+    1 (GTV/annual exceedance) is NOT included -- treated as
+    a fixed, dispatch-independent cost, out of scope for now.
+    optimize.py therefore only minimizes the sum of the 12 monthly peaks × the
+    monthly tariff, not the full Liander cost structure.
 
-    TODO, in volgorde:
-    - De onderstaande getallen zijn SCHATTINGEN uit een AI-samenvatting van
-      de Liander-PDF, NIET handmatig geverifieerd -- twee pogingen gaven
-      onderling inconsistente cijfers voor dezelfde deelmarkt. Controleer
-      zelf de exacte tabel in:
+    TODO, in order:
+    - The numbers below are ESTIMATES from an AI summary of
+      the Liander PDF, NOT manually verified -- two attempts gave
+      mutually inconsistent figures for the same sub-market. Check
+      the exact table yourself in:
       https://www.liander.nl/-/media/files/tarieven/grootzakelijk/tarieven-2026/tarieven-voor-aansluiting-en-transport-elektriciteit-2026_2.pdf
-    - Zodra geverifieerd: component 1 (GTV) alsnog toevoegen aan het model,
-      bv. als een peak_floor-constraint op een jaarlijkse piek.
+    - Once verified: add component 1 (GTV) to the model after all,
+      e.g. as a peak_floor constraint on an annual peak.
     """
-    # Component: transporttarief over het totale jaarvolume, kWh -- geen
-    # piek-relatie. SCHATTING, niet geverifieerd: €0,0226/kWh (deelmarkt
-    # MS/LS > 50 t/m 136 kW).
+    # Component: transport tariff over the total annual volume, kWh -- no
+    # relation to the peak. ESTIMATE, not verified: €0.0226/kWh (sub-market
+    # MS/LS > 50 up to and including 136 kW).
     transport_tariff_eur_per_kwh: float | None = 0.0226
 
-    # Component: "kW max. mnd" -- tarief per kW van de hoogste gemeten
-    # piek in een kalendermaand. Dit is het enige capaciteitstarief dat
-    # optimize.py momenteel gebruikt. SCHATTING, niet geverifieerd:
-    # €3,57/kW/maand (deelmarkt MS/LS > 50 t/m 136 kW).
+    # Component: "kW max. mnd" -- tariff per kW of the highest measured
+    # peak in a calendar month. This is the only capacity tariff that
+    # optimize.py currently uses. ESTIMATE, not verified:
+    # €3.57/kW/month (sub-market MS/LS > 50 up to and including 136 kW).
     monthly_peak_tariff_eur_per_kw: float | None = 3.57
 
-    # Energiebelasting (NET-5): vast tarief per geïmporteerde kWh, marginale
-    # schijf 50.000-10 mln kWh, 2026, excl. btw. Alleen op import, geen
-    # saldering bij grootverbruik. De hogere tarieven van de eerste
-    # 50.000 kWh zijn een vaste kost en niet beslissingsrelevant.
+    # Energy tax (energiebelasting, NET-5): fixed rate per imported kWh, marginal
+    # bracket 50,000-10 million kWh, 2026, excl. VAT. Only on import, no
+    # net metering (saldering) for large consumers. The higher rates of the first
+    # 50,000 kWh are a fixed cost and not decision-relevant.
     energy_tax_eur_per_kwh: float = 0.03735
 
-    # Hypothetische dubbele energiebelasting op opslag (NET-6), per kWh die de
-    # batterij in gaat (charge_kwh, dus ook PV-laden: bovengrens).
-    # 0.0 = scenario A (basis); gelijk aan energy_tax_eur_per_kwh = scenario B.
+    # Hypothetical double energy tax on storage (NET-6), per kWh that goes into
+    # the battery (charge_kwh, so PV charging too: upper bound).
+    # 0.0 = scenario A (base); equal to energy_tax_eur_per_kwh = scenario B.
     storage_charge_tax_eur_per_kwh: float = 0.0
 
-    # Niet gebruikt in het huidige vereenvoudigde model -- bewaard voor
-    # wanneer component 1 (GTV/jaarlijkse overschrijding) wordt toegevoegd.
-    # SCHATTING, niet geverifieerd: €3,74/kW/maand voor het GTV-tarief.
+    # Not used in the current simplified model -- kept for when
+    # component 1 (GTV/annual exceedance) is added.
+    # ESTIMATE, not verified: €3.74/kW/month for the GTV tariff.
     contracted_capacity_kw: float | None = None
     contracted_capacity_tariff_eur_per_kw: float | None = 3.74
 

@@ -12,11 +12,12 @@ Verified file structure:
 - WAARDE is relative/normalized, observed range ~0.31-0.90 (not absolute kWh)
 
 NOTE on what this profile actually is (see ASSUMPTIONS.md): this is one of
-Liander's own "K&O" standard profiles, built from real grootverbruik
-telemetry and used by Liander itself to size new grootverbruik connections
-without their own history yet. It is NOT a NEDU/EDSN kleinverbruik
-allocation profile (E1A-E4A). The profile shape says nothing about whether
-the building you scale it to is klein- or grootverbruik -- that is purely
+Liander's own "K&O" standard profiles, built from real large-consumer (grootverbruik)
+telemetry and used by Liander itself to size new large-consumer connections
+without their own history yet. It is NOT a NEDU/EDSN small-consumer
+(kleinverbruik) allocation profile (E1A-E4A). The profile shape says nothing
+about whether the building you scale it to is a small or large consumer
+(klein- or grootverbruik) -- that is purely
 a function of the scale you multiply it by (see derive_peak_kwh_per_quarter
 below), not of the profile itself.
 """
@@ -35,8 +36,8 @@ def get_relative_profile() -> pd.Series:
     Load the raw, normalized K&O consumption profile shape (0-1 range),
     not yet scaled to any specific building's peak.
 
-    This is the "vorm" half of the profile -- see derive_peak_kwh_per_quarter
-    for the "schaal" half. Split out so the profile shape can be reused for
+    This is the "shape" half of the profile -- see derive_peak_kwh_per_quarter
+    for the "scale" half. Split out so the profile shape can be reused for
     both scaling a load (get_load_profile) and for deriving
     peak_kwh_per_quarter from a target annual consumption (main.py).
 
@@ -58,17 +59,17 @@ def get_relative_profile() -> pd.Series:
     df["DATUM_TIJDSTIP"] = pd.to_datetime(df["DATUM_TIJDSTIP"])
     df = df.set_index("DATUM_TIJDSTIP")
 
-    # Genormaliseerd profiel (365x96, geen gaps -- zie docstring), dus
-    # geen echte klokwissel-onregelmatigheid in de brondata. tz_localize
-    # botst daar toch op: nonexistent (maart) schuiven we door,
-    # ambiguous (oktober) kiezen we bewust als zomertijd -- pragmatisch
-    # correct voor een genormaliseerd patroon, niet voor een echte meting.
+    # Normalized profile (365x96, no gaps -- see docstring), so
+    # no real clock-change irregularity in the source data. tz_localize
+    # still trips over it: nonexistent (March) we shift forward,
+    # ambiguous (October) we deliberately pick as summer time -- pragmatically
+    # correct for a normalized pattern, not for a real measurement.
     df.index = df.index.tz_localize(
         "Europe/Amsterdam", nonexistent="shift_forward", ambiguous=True
     )
-    # shift_forward (maart) kan botsen met al bestaande rijen in dit
-    # uniforme 96-per-dag-profiel -- voor synthetische data is er geen
-    # "juiste" van de twee, dus expliciet dedupliceren i.p.v. laten gokken
+    # shift_forward (March) can collide with already existing rows in this
+    # uniform 96-per-day profile -- for synthetic data there is no
+    # "correct" one of the two, so deduplicate explicitly instead of guessing
     df = df[~df.index.duplicated(keep="first")]
 
     # Re-normalize to the profile's own max, so peak_kwh_per_quarter is
@@ -158,8 +159,8 @@ if __name__ == "__main__":
     # Sanity check for derive_peak_kwh_per_quarter: round-tripping a
     # chosen area/intensity should reproduce a consistent annual total.
     relative_profile = get_relative_profile()
-    print(f"\nsom(relative_profile) = {relative_profile.sum():.2f}")
+    print(f"\nsum(relative_profile) = {relative_profile.sum():.2f}")
     derived_peak = derive_peak_kwh_per_quarter(
         area_m2=590.0, annual_kwh_per_m2=115.0, relative_profile=relative_profile
     )
-    print(f"derive_peak_kwh_per_quarter(590 m2, 115 kWh/m2/jaar) = {derived_peak:.2f} kWh/kwartier")
+    print(f"derive_peak_kwh_per_quarter(590 m2, 115 kWh/m2/year) = {derived_peak:.2f} kWh/quarter-hour")

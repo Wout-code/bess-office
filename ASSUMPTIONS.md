@@ -1,285 +1,285 @@
-# Aannames — bess-office
+# Assumptions — bess-office
 
-ID-schema: elke aanname heeft een uniek ID (`DATA-n`, `BAT-n`, `TIME-n`,
-`NET-n`, `ARCH-n`), doorlopend genummerd ongeacht V1/V2. Als V2 een
-V1-aanname corrigeert, krijgt de correctie een nieuw ID en verwijst
-terug naar het oude (bv. "corrigeert BAT-1"). Zo blijft zichtbaar wat
-vervangen is versus wat ongewijzigd overeind blijft. Code-comments
-verwijzen naar deze ID's — bij wijziging hier, ook de bijbehorende
-code-comment nalopen.
+ID scheme: every assumption has a unique ID (`DATA-n`, `BAT-n`, `TIME-n`,
+`NET-n`, `ARCH-n`), numbered consecutively regardless of V1/V2. If V2
+corrects a V1 assumption, the correction gets a new ID and refers
+back to the old one (e.g. "corrects BAT-1"). This keeps it visible what
+has been replaced versus what still stands unchanged. Code comments
+refer to these IDs — when changing something here, also check the
+corresponding code comment.
 
-Vervangen/verouderde aannames staan niet meer in dit document — die
-geschiedenis leeft in git (`git log -p ASSUMPTIONS.md`). Dit bestand
-toont alleen wat nu geldt.
+Replaced/outdated assumptions are no longer in this document — that
+history lives in git (`git log -p ASSUMPTIONS.md`). This file
+shows only what currently applies.
 
-## Data & referentiecasus (geldt voor V1 én V2 — gaat over de invoer, niet de berekening)
+## Data & reference case (applies to both V1 and V2 — concerns the input, not the calculation)
 
-Dit zijn geen aannames over hoe er gerekend wordt (dat staat bij V1/V2
-hieronder) — dit gaat over wat de data zelf voorstelt en waar de
-beperkingen daarin zitten. Identiek van toepassing ongeacht welk
-rekenmodel je gebruikt.
+These are not assumptions about how the calculation works (that is under V1/V2
+below) — this is about what the data itself represents and where its
+limitations lie. Applies identically regardless of which
+calculation model you use.
 
-**DATA-1 — Tijdzone**
-- Alle drie databronnen (load, PV, prijzen) worden expliciet omgezet naar
-  Europe/Amsterdam, niet UTC. Reden: het capaciteitstarief en
-  dispatch-beslissingen zijn gebonden aan lokale kloktijd (bv.
-  "avondpiek om 18:00"), niet aan UTC. Prijs die daarvoor betaald wordt:
-  de klokwissels in maart/oktober moeten expliciet afgehandeld worden
-  (zie DATA-5/DATA-6 hieronder) — UTC had die complexiteit vermeden,
-  maar zou resultaten minder direct herkenbaar maken t.o.v. de
-  werkelijke lokale gebruikssituatie.
+**DATA-1 — Time zone**
+- All three data sources (load, PV, prices) are explicitly converted to
+  Europe/Amsterdam, not UTC. Reason: the capacity tariff and
+  dispatch decisions are tied to local clock time (e.g.
+  "evening peak at 18:00"), not to UTC. The price paid for this:
+  the clock changes in March/October must be handled explicitly
+  (see DATA-5/DATA-6 below) — UTC would have avoided that complexity,
+  but would make results less directly recognizable relative to the
+  actual local usage situation.
 
-**DATA-2 — Resolutie**
-- Kwartier, voor beide bestanden identiek — geen V1/V2-verschil. Dit was
-  altijd een `main.py`-keuze (welke data je aanlevert), nooit iets in
-  `dispatch_sim.py`/`optimize.py` zelf: beide nemen gewoon
-  `timestep_hours` als parameter en rekenen met wat ze krijgen. `main.py`
-  upsamplet PV naar kwartier (i.p.v. load downsamplen naar uur), zodat de
-  factuurbepalende kwartier-piek niet wegmiddelt.
+**DATA-2 — Resolution**
+- Quarter-hour, identical for both files — no V1/V2 difference. This was
+  always a `main.py` choice (which data you supply), never something in
+  `dispatch_sim.py`/`optimize.py` itself: both simply take
+  `timestep_hours` as a parameter and compute with whatever they get. `main.py`
+  upsamples PV to quarter-hours (instead of downsampling load to hours), so that the
+  billing-relevant quarter-hour peak is not averaged away.
 
-**DATA-5 — PV-data (PVGIS)**
-- PVGIS gebruikt standaard (`usehorizon=True`, geen `userhorizon`) een
-  terreinschaduw-model op basis van een hoogtekaart — dat ziet natuurlijke
-  verhogingen (heuvels), maar geen gebouwen. Staat het referentiepand op
-  een bedrijventerrein/binnenstedelijk met hogere buurpanden die
-  vroeg/laat schaduw werpen, dan onderschat PVGIS die verliezen
-  structureel, zonder waarschuwing in de output — de PV-opbrengst is dan
-  te hoog ingeschat.
+**DATA-5 — PV data (PVGIS)**
+- By default (`usehorizon=True`, no `userhorizon`), PVGIS uses a
+  terrain shading model based on an elevation map — it sees natural
+  elevations (hills), but not buildings. If the reference building is on
+  a business park/in an urban area with taller neighbouring buildings that
+  cast shade early/late in the day, PVGIS structurally underestimates those losses,
+  without any warning in the output — the PV yield is then
+  overestimated.
 
-**DATA-6 — Load-data (Liander K&O-profiel)**
-- Genormaliseerd profiel, geen echte meting — daardoor ook geen echte
-  klokwissel-onregelmatigheid (365×96 kwartieren, geen gaps). Bij
-  tz-aware maken is daarom een bewuste, pragmatische keuze nodig
-  (`nonexistent="shift_forward"`, `ambiguous=True`) in plaats van een
-  echte DST-correctie zoals bij prijzen/PV, die wél op echte metingen
-  draaien.
-  Let op wat dit profiel wél is: Liander's eigen K&O-standaardprofiel,
-  opgebouwd uit telemetrie van grootverbruikers en door Liander zelf
-  gebruikt om nieuwe grootverbruik-klanten in te schatten (zie externe
-  documentatie MOOI EIGEN SBI-profielen). De profielvorm bepaalt dus
-  niets over klein- of grootverbruik van het gemodelleerde pand — dat is
-  puur een functie van de schaal (area_m2/annual_kwh_per_m2, zie DATA-8),
-  niet van dit bestand.
+**DATA-6 — Load data (Liander K&O profile)**
+- Normalized profile, not a real measurement — therefore also no real
+  clock-change irregularity (365×96 quarter-hours, no gaps). Making it
+  tz-aware therefore requires a deliberate, pragmatic choice
+  (`nonexistent="shift_forward"`, `ambiguous=True`) instead of a
+  real DST correction as for prices/PV, which do run on real
+  measurements.
+  Note what this profile actually is: Liander's own K&O standard profile,
+  built from telemetry of large consumers (grootverbruikers) and used by Liander itself
+  to estimate new large-consumer customers (see external
+  documentation MOOI EIGEN SBI-profielen). The profile shape therefore determines
+  nothing about whether the modeled building is a small or large consumer (klein- of grootverbruik) — that is
+  purely a function of the scale (area_m2/annual_kwh_per_m2, see DATA-8),
+  not of this file.
 
-**DATA-7 — Load-profiel afvlakking (Gelijktijdigheid)**
-- Omdat het Liander K&O-profiel een wiskundig gemiddelde is van honderden
-  panden, is de curve afgevlakt (gelijktijdigheidsfactor). De pieken van
-  een echt pand zijn hoger, dus de waarde van piekverlaging wordt in dit
-  model waarschijnlijk onderschat. Die echte pieken zijn wel kort en
-  grillig, en daardoor in de praktijk lastiger te voorspellen en weg te
-  werken dan hier met een perfecte voorspelling (TIME-2).
+**DATA-7 — Load profile smoothing (coincidence)**
+- Because the Liander K&O profile is a mathematical average of hundreds of
+  buildings, the curve is smoothed (coincidence factor). The peaks of
+  a real building are higher, so the value of peak reduction is in this
+  model probably underestimated. Those real peaks are, however, short and
+  erratic, and therefore in practice harder to predict and to
+  eliminate than here with a perfect forecast (TIME-2).
 
-**DATA-8 — Referentiepand, grootverbruik-schaal**
-- 4.500 m² i.p.v. 590 m², annual_kwh_per_m2 ongewijzigd (115 kWh/m²/jaar,
-  NL-gemiddelde, verandert niet met schaal). Bewust gekozen zodat de
-  berekende piek ruim boven de grootverbruik-grens (55 kVA / 3x80A)
-  uitkomt, i.p.v. er net tegenaan te zitten. Berekening:
-  som(relative_profile) op KO_KANTOOR_ONDERWIJS, geverifieerd via
-  `get_relative_profile().sum()`: 20.824,42. 4.500 x 115 = 517.500
-  kWh/jaar -> peak_kwh_per_quarter = 517.500 / 20.824,42 = 24,85
-  kWh/kwartier -> piek = 99,4 kW (geverifieerd via notebook-run).
-  peak_kwh_per_quarter is geen los BuildingConfig-veld meer, maar wordt
-  afgeleid in main.py via derive_peak_kwh_per_quarter() (fetch_load.py)
-  — voorkomt dat area_m2 en peak_kwh_per_quarter stilzwijgend uit elkaar
-  lopen.
+**DATA-8 — Reference building, large-consumer scale**
+- 4,500 m² instead of 590 m², annual_kwh_per_m2 unchanged (115 kWh/m²/year,
+  Dutch average, does not change with scale). Deliberately chosen so that the
+  calculated peak ends up well above the large-consumer threshold (55 kVA / 3x80A),
+  instead of sitting right at it. Calculation:
+  sum(relative_profile) on KO_KANTOOR_ONDERWIJS, verified via
+  `get_relative_profile().sum()`: 20,824.42. 4,500 x 115 = 517,500
+  kWh/year -> peak_kwh_per_quarter = 517,500 / 20,824.42 = 24.85
+  kWh/quarter-hour -> peak = 99.4 kW (verified via notebook run).
+  peak_kwh_per_quarter is no longer a separate BuildingConfig field, but is
+  derived in main.py via derive_peak_kwh_per_quarter() (fetch_load.py)
+  — prevents area_m2 and peak_kwh_per_quarter from silently drifting
+  apart.
 
-**DATA-9 — Batterijmodel, BOLT-241**
-- Boltainer BOLT-241 (NL fabrikant): 241 kWh capaciteit, vermogensopties
-  49/60/99/120 kW. 99 kW gekozen o.b.v. de berekende piek (99,4 kW,
-  DATA-8) — zelfde "vermogen ≈ piek"-logica als bij de oorspronkelijke
-  SigenStor-keuze. Capaciteit gecontroleerd tegen dezelfde
-  capaciteit-t.o.v.-dagverbruik-ratio als eerder (~19%): nieuw
-  daggemiddelde 517.500/365 ≈ 1.418 kWh/dag, 19% daarvan ≈ 270 kWh — 241
-  kWh ligt iets onder die ratio (iets vaker/dieper cyclen dan bij de oude
-  verhouding).
-  LET OP: gevonden via één zoekopdracht, niet grondig geverifieerd op
-  prijs/beschikbaarheid/leveringstermijn. Bruikbare capaciteit (na
-  min/max SoC) en round-trip efficiency van dit specifieke product zijn
-  niet apart opgezocht — BatteryConfig gebruikt hiervoor nog de oude,
-  generieke SigenStor-aannames (90%/10%/95%) als placeholder. TODO:
-  verifiëren.
+**DATA-9 — Battery model, BOLT-241**
+- Boltainer BOLT-241 (Dutch manufacturer): 241 kWh capacity, power options
+  49/60/99/120 kW. 99 kW chosen based on the calculated peak (99.4 kW,
+  DATA-8) — same "power ≈ peak" logic as in the original
+  SigenStor choice. Capacity checked against the same
+  capacity-to-daily-consumption ratio as before (~19%): new
+  daily average 517,500/365 ≈ 1,418 kWh/day, 19% of that ≈ 270 kWh — 241
+  kWh is slightly below that ratio (cycling slightly more often/deeper than with the old
+  ratio).
+  NOTE: found via a single search, not thoroughly verified for
+  price/availability/delivery time. Usable capacity (after
+  min/max SoC) and round-trip efficiency of this specific product have
+  not been looked up separately — BatteryConfig still uses the old,
+  generic SigenStor assumptions (90%/10%/95%) as a placeholder for these. TODO:
+  verify.
 
-**DATA-10 — PV-dimensionering, exportbewust**
-- 190 kWp i.p.v. 25 kWp, zelfde onderliggende verhouding als het
-  oorspronkelijke (niet-gedocumenteerde) "jaarverbruik-vuistregel"-
-  commentaar bij PVConfig: 25 kWp / 67.850 kWh (oud jaarverbruik) ≈ 0,368
-  kWp per MWh/jaar, toegepast op het nieuwe jaarverbruik (517.500 kWh) ->
-  ~190,6 kWp.
-  Bewuste keuze tussen twee strategieën: (a) exportbewust, ~33%
-  jaardekking (190 kWp, gekozen) vs. (b) volledige jaarverbruik-dekking
-  (~673 kWp, gangbare residentiële vuistregel: 1,3 kWp per 1.000 kWh
-  jaarverbruik). Voor (b) is ~2.605 m² dakoppervlak nodig (1.447 panelen
-  à 465 Wp x 1,8 m²/paneel), voor (a) ~736 m² — laatstgenoemde past
-  comfortabel binnen een 4.500 m² pand, eerstgenoemde is aan de krappe
-  kant.
-  Reden voor (a): bij grootverbruik is export structureel lager
-  gewaardeerd dan zelfconsumptie (zie ARCH-5) — een installatie die
-  vooral op export mikt, benut een groot deel van zijn kWp op het minst
-  waardevolle deel van de opbrengst.
-  LET OP: dit is een verhouding-behoudende extrapolatie van een
-  oorspronkelijk niet-onderbouwd getal (geen notebook/berekening
-  teruggevonden voor de originele 25 kWp), geen onafhankelijk
-  geverifieerde vuistregel. TODO indien tijd: eigen onderbouwing (bv.
-  dakoppervlak-beschikbaarheid) i.p.v. verhouding-behoud.
+**DATA-10 — PV sizing, export-aware**
+- 190 kWp instead of 25 kWp, same underlying ratio as the
+  original (undocumented) "annual consumption rule of thumb"
+  comment in PVConfig: 25 kWp / 67,850 kWh (old annual consumption) ≈ 0.368
+  kWp per MWh/year, applied to the new annual consumption (517,500 kWh) ->
+  ~190.6 kWp.
+  Deliberate choice between two strategies: (a) export-aware, ~33%
+  annual coverage (190 kWp, chosen) vs. (b) full annual consumption
+  coverage (~673 kWp, common residential rule of thumb: 1.3 kWp per 1,000 kWh
+  annual consumption). (b) requires ~2,605 m² of roof area (1,447 panels
+  at 465 Wp x 1.8 m²/panel), (a) ~736 m² — the latter fits
+  comfortably within a 4,500 m² building, the former is on the tight
+  side.
+  Reason for (a): for large consumers, export is structurally valued lower
+  than self-consumption (see ARCH-5) — an installation that
+  mainly targets export uses a large part of its kWp on the least
+  valuable part of the yield.
+  NOTE: this is a ratio-preserving extrapolation of an
+  originally unsubstantiated number (no notebook/calculation
+  found for the original 25 kWp), not an independently
+  verified rule of thumb. TODO if time permits: own justification (e.g.
+  roof area availability) instead of ratio preservation.
 
 ---
 
-## V1 — alleen dispatch_sim.py (regelgebaseerd)
+## V1 — dispatch_sim.py only (rule-based)
 
-**Batterij**
-- **BAT-1** — Symmetrisch laad-/ontlaadvermogen — zelfde vermogen beide
-  richtingen (vereenvoudiging, niet fysiek correct — gecorrigeerd in V2,
-  zie BAT-7)
-- **BAT-2** — Ontladen is verliesvrij, laadverlies zit alleen bij het laden
-- **BAT-3** — Geen degradatie over tijd — capaciteit/efficiëntie blijven
+**Battery**
+- **BAT-1** — Symmetric charge/discharge power — same power in both
+  directions (simplification, not physically correct — corrected in V2,
+  see BAT-7)
+- **BAT-2** — Discharging is lossless; charging losses occur only when charging
+- **BAT-3** — No degradation over time — capacity/efficiency remain
   constant.
-  Degradatie zit daarom ook bewust **niet** in de LP-objective (geen
-  cycluskost). Onderbouwing: gemeten equivalente volle cycli/jaar
-  (`main.py`, 2023-data) zijn RBC 102, LP scenario A 487 (1,33/dag), LP
-  scenario B 264. Dat staat tegenover ≥ 6000 cycli voor de BOLT-241 (opgave,
-  niet geverifieerd, zie DATA-9): zelfs bij 487/jaar ~12 jaar. Bij lage
-  C-rates bepalen vooral tijd, temperatuur en doorgezette lading de
-  veroudering, en nauwelijks de cyclusdiepte (DoD) (Wang et al., 2011);
-  hun tests begonnen bij C/2, dit systeem draait op 99 kW / 241 kWh ≈ 0,41C.
-  Een DoD-afhankelijke kost is daarom niet nodig; een kost per doorgezette
-  kWh wel, maar die is niet geïmplementeerd.
-- **BAT-4** — Geen minimale aan/uit-tijd — batterij schakelt vrij
-- **BAT-5** — Efficiëntie/capaciteit constant, ongeacht SoC, laadsnelheid
-  of temperatuur
-- **BAT-6** — Geen zelfontlading
+  Degradation is therefore also deliberately **not** in the LP objective (no
+  cycle cost). Rationale: measured
+  equivalent full cycles/year (`main.py`, 2023 data) are RBC 102, LP
+  scenario A 487 (1.33/day), LP scenario B 264. That compares with ≥ 6000 cycles for the BOLT-241 (manufacturer's
+  specification, not verified, see DATA-9): even at 487/year ~12 years. At low
+  C-rates, ageing is mainly determined by time, temperature and throughput,
+  and hardly by depth of discharge (DoD) (Wang et al., 2011);
+  their tests started at C/2, this system runs at 99 kW / 241 kWh ≈ 0.41C.
+  A DoD-dependent cost is therefore not needed; a cost per kWh of throughput
+  is, but that is not implemented.
+- **BAT-4** — No minimum on/off time — battery switches freely
+- **BAT-5** — Efficiency/capacity constant, regardless of SoC, charging rate
+  or temperature
+- **BAT-6** — No self-discharge
 
-**Tijd**
-- **TIME-1** — Geen vooruitkijken — puur reactief, elk kwartier op zichzelf
+**Time**
+- **TIME-1** — No look-ahead — purely reactive, each quarter-hour on its own
 
-**Markt/Net**
-- **NET-1** — Eén vaste, statische peak-drempel voor het hele jaar
-  (gecorrigeerd in V2, zie NET-4)
-- **NET-2** — Peak shaving reageert alleen op import, niet op exportpieken
-- **NET-3** — Onbeperkte teruglevering — geen exportlimiet/curtailment
+**Market/Grid**
+- **NET-1** — One fixed, static peak threshold for the whole year
+  (corrected in V2, see NET-4)
+- **NET-2** — Peak shaving responds only to import, not to export peaks
+- **NET-3** — Unlimited feed-in — no export limit/curtailment
 
-**Architectuur**
-- **ARCH-1** — Geen kosten/prijzen in het model zelf — puur een fysieke
-  energiestroom-simulatie, financiële vertaling gebeurt elders
-- **ARCH-2** — Batterij kan structureel nooit vanaf het net laden — alleen
-  vanaf PV-overschot (gecorrigeerd in V2, zie ARCH-3)
-- **ARCH-5 — Symmetrische import-/exportprijzen** — `compute_financial_metrics`
-  waardeert import en export tegen dezelfde day-ahead-prijs. In
-  werkelijkheid mist export het vermeden-transporttarief dat
-  zelfconsumptie wél bespaart, en wordt teruglevering bij grootverbruik
-  doorgaans lager vergoed dan de volledige importprijs
-  (marktprijs-gekoppeld leverancierscontract — bij grootverbruik is er
-  geen saldering, dus geen vaste 1-op-1-verrekening om op terug te
-  vallen). Richting van de fout: dit overwaardeert export, en dus een
-  grotere PV-installatie t.o.v. een kleinere (zie DATA-10). Kwantitatieve
-  correctie vereist een reëel terugleverings-contract-getal dat nu niet
-  beschikbaar is — TODO. Blijft ongewijzigd van kracht voor V2:
-  `optimize.py` gebruikt `main.py`'s `compute_financial_metrics` niet
-  zelf, maar de financiële nabewerking in `main.py` is identiek voor
-  beide dispatch-versies.
+**Architecture**
+- **ARCH-1** — No costs/prices in the model itself — purely a physical
+  energy-flow simulation, the financial translation happens elsewhere
+- **ARCH-2** — Battery can structurally never charge from the grid — only
+  from PV surplus (corrected in V2, see ARCH-3)
+- **ARCH-5 — Symmetric import/export prices** — `compute_financial_metrics`
+  values import and export at the same day-ahead price. In
+  reality, export misses the avoided transport tariff that
+  self-consumption does save, and feed-in for large consumers is
+  usually compensated below the full import price
+  (market-price-linked supplier contract — for large consumers there is
+  no net metering (saldering), so no fixed 1-to-1 settlement to
+  fall back on). Direction of the error: this overvalues export, and therefore a
+  larger PV installation relative to a smaller one (see DATA-10). A quantitative
+  correction requires a real feed-in contract figure that is currently not
+  available — TODO. Remains in force unchanged for V2:
+  `optimize.py` does not use `main.py`'s `compute_financial_metrics`
+  itself, but the financial post-processing in `main.py` is identical for
+  both dispatch versions.
 
 ---
 
 # V2 — dispatch_sim.py + optimize.py
 
-`dispatch_sim.py` verdwijnt niet in V2 — het blijft bestaan naast
-`optimize.py`, en krijgt de fixes die geen kwestie van algoritme zijn maar
-van correcte fysica of betere parameters.
+`dispatch_sim.py` does not disappear in V2 — it remains alongside
+`optimize.py`, and receives the fixes that are not a matter of algorithm but
+of correct physics or better parameters.
 
-## Gedeeld tussen beide bestanden in V2
+## Shared between both files in V2
 
-**Batterij**
-- **BAT-7** — Asymmetrisch laad-/ontlaadvermogen — corrigeert BAT-1.
-  **Gepland, nog niet geïmplementeerd**: beide bestanden gebruiken nog
-  `power_kw` voor laden én ontladen, BAT-1 is dus feitelijk nog van kracht.
-- BAT-2 t/m BAT-6 blijven ongewijzigd van kracht
+**Battery**
+- **BAT-7** — Asymmetric charge/discharge power — corrects BAT-1.
+  **Planned, not yet implemented**: both files still use
+  `power_kw` for charging and discharging, so BAT-1 is effectively still in force.
+- BAT-2 through BAT-6 remain in force unchanged
 
-**Markt/Net**
-- **NET-4** — Geoptimaliseerde peak-drempel i.p.v. vaste jaardrempel —
-  corrigeert NET-1. In `optimize.py` intern: één piekvariabele per
-  kalendermaand. In `dispatch_sim.py` blijft het één drempel voor het hele
-  jaar, maar die wordt niet meer met de hand gekozen: `main.py`
-  (`select_rbc_threshold`) scant 50–98 kW in stappen van 2 kW
-  (`DispatchConfig.threshold_scan_*`) en kiest de drempel met de laagste
-  jaarlijkse netto kosten (2023: 52 kW). Prijzen komen alleen in die scan
-  voor, de regel zelf blijft prijsloos en reactief (ARCH-1, TIME-1). Let
-  op: dit is een ex-post keuze op hetzelfde jaar (in-sample), dus gunstig
-  voor de RBC.
-- **NET-5** — Energiebelasting als vast tarief per geïmporteerde kWh
-  (`GridTariffConfig.energy_tax_eur_per_kwh = 0,03735`): de marginale schijf
-  50.000–10 mln kWh, 2026-tarief excl. btw, toegepast op 2023-prijzen.
-  Alleen op import, geen saldering (grootverbruik). Zit zowel in de
-  LP-objective als in `compute_financial_metrics`. De hogere tarieven van de
-  eerste 50.000 kWh zijn niet gemodelleerd: dat is een vaste kost, niet
-  beslissingsrelevant.
-- **NET-6** — Scenario B: hypothetische dubbele energiebelasting op opslag,
-  nog eens 0,03735 EUR per kWh die de batterij in gaat
-  (`storage_charge_tax_eur_per_kwh`, default 0,0 = scenario A). Gebaseerd op
-  de discussie over dubbele energiebelasting bij opslag, die in
-  werkelijkheid vooral speelt achter kleinverbruikersaansluitingen. Het is
-  een bovengrens, want ook PV-laden (alle `charge_kwh`) wordt belast. De
-  LP wordt voor B opnieuw opgelost; de RBC-dispatch is prijsloos en blijft
-  gelijk, alleen zijn kosten worden herberekend.
-- Zie ARCH-5 (bij V1 — Architectuur) voor export/import symmetrisch
-  geprijsd — geldt identiek voor V2, geen apart NET-ID nodig.
-- NET-2, NET-3 blijven ongewijzigd van kracht
+**Market/Grid**
+- **NET-4** — Optimized peak threshold instead of a fixed annual threshold —
+  corrects NET-1. Internally in `optimize.py`: one peak variable per
+  calendar month. In `dispatch_sim.py` it remains one threshold for the whole
+  year, but it is no longer chosen by hand: `main.py`
+  (`select_rbc_threshold`) scans 50–98 kW in steps of 2 kW
+  (`DispatchConfig.threshold_scan_*`) and selects the threshold with the lowest
+  annual net cost (2023: 52 kW). Prices appear only in that scan;
+  the rule itself remains price-agnostic and reactive (ARCH-1, TIME-1). Note:
+  this is an ex-post choice on the same year (in-sample), and thus favourable
+  to the RBC.
+- **NET-5** — Energy tax (energiebelasting) as a fixed rate per imported kWh
+  (`GridTariffConfig.energy_tax_eur_per_kwh = 0.03735`): the marginal bracket
+  50,000–10 million kWh, 2026 rate excl. VAT, applied to 2023 prices.
+  Only on import, no net metering (saldering) (large consumer). Included both in the
+  LP objective and in `compute_financial_metrics`. The higher rates of the
+  first 50,000 kWh are not modeled: that is a fixed cost, not
+  decision-relevant.
+- **NET-6** — Scenario B: hypothetical double energy tax on storage,
+  an additional 0.03735 EUR per kWh that goes into the battery
+  (`storage_charge_tax_eur_per_kwh`, default 0.0 = scenario A). Based on
+  the debate about double energy taxation on storage, which in
+  reality mainly applies behind small-consumer connections. It is
+  an upper bound, because PV charging (all `charge_kwh`) is taxed as well. The
+  LP is re-solved for B; the RBC dispatch is price-agnostic and stays
+  the same, only its costs are recalculated.
+- See ARCH-5 (under V1 — Architecture) for export/import priced symmetrically
+  — applies identically to V2, no separate NET ID needed.
+- NET-2, NET-3 remain in force unchanged
 
-**Architectuur**
-- **ARCH-3** — Grid-charging wordt mogelijk — corrigeert ARCH-2.
-  Geïmplementeerd in beide bestanden. `optimize.py`: vrij, de solver
-  beslist. `dispatch_sim.py`: standaard peak-shaving-regel — zolang de
-  import (kW) onder de drempel blijft, laden vanaf het net met hooguit de
-  resterende ruimte tot de drempel, begrensd door `power_kw` (minus wat al
-  van PV geladen wordt) en max SoC, met hetzelfde laadverlies als PV-laden
-  (BAT-2). Bijeffect: de RBC-zelfconsumptie daalt (2023, drempel 52 kW: 83,1%
-  zonder vs. 78,6% met grid-charging; zonder batterij 78,3%), omdat de
-  batterij vaker vol is als er PV-overschot komt: peak shaving en
-  zelfconsumptie concurreren om dezelfde SoC, en de drempel maakt die
-  afweging impliciet. Ook de netto kosten van de RBC zijn bij dezelfde drempel iets
-  hoger met grid-charging (€63.558 vs. €63.300).
+**Architecture**
+- **ARCH-3** — Grid charging becomes possible — corrects ARCH-2.
+  Implemented in both files. `optimize.py`: free, the solver
+  decides. `dispatch_sim.py`: standard peak-shaving rule — as long as the
+  import (kW) stays below the threshold, charge from the grid with at most the
+  remaining headroom up to the threshold, limited by `power_kw` (minus what is already
+  being charged from PV) and max SoC, with the same charging loss as PV charging
+  (BAT-2). Side effect: RBC self-consumption drops (2023, threshold 52 kW: 83.1%
+  without vs. 78.6% with grid charging; without battery 78.3%), because the
+  battery is more often full when PV surplus arrives: peak shaving and
+  self-consumption compete for the same SoC, and the threshold makes that
+  trade-off implicitly. The net cost of the RBC at the same threshold is also slightly
+  higher with grid charging (€63,558 vs. €63,300).
 
-## dispatch_sim.py specifiek (blijft regelgebaseerd)
+## dispatch_sim.py specific (remains rule-based)
 
-**Tijd**
-- TIME-1 blijft ongewijzigd van kracht — nog steeds geen vooruitkijken,
-  inherent aan een reactieve regel, niet iets wat "gefixed" wordt
+**Time**
+- TIME-1 remains in force unchanged — still no look-ahead,
+  inherent to a reactive rule, not something that gets "fixed"
 
-**Architectuur**
-- ARCH-1 blijft ongewijzigd van kracht voor dit bestand — nog steeds geen
-  kosten in het model zelf, financiële vertaling gebeurt elders
+**Architecture**
+- ARCH-1 remains in force unchanged for this file — still no
+  costs in the model itself, the financial translation happens elsewhere
 
 ## optimize.py
 
-**Tijd**
-- **TIME-2** — Perfecte forecast binnen de horizon — vervangt TIME-1
-  voor dit bestand ("geen vooruitkijken" vervalt)
+**Time**
+- **TIME-2** — Perfect forecast within the horizon — replaces TIME-1
+  for this file ("no look-ahead" no longer applies)
 
-**Architectuur**
-- **ARCH-4** — Kosten zitten direct in de objective, geen aparte
-  financiële laag — vervangt ARCH-1 voor dit bestand
+**Architecture**
+- **ARCH-4** — Costs sit directly in the objective, no separate
+  financial layer — replaces ARCH-1 for this file
 
-**Batterij**
-- **BAT-8** — Aangenomen dat laden en ontladen nooit tegelijk gebeuren
-  omdat de solver altijd de efficiëntste oplossing kiest. **Gecontroleerd
-  (2023-data): klopt niet bij negatieve prijzen.** Scenario A: 399 van de
-  35.032 kwartieren met gelijktijdig laden en ontladen, allemaal bij een
-  negatieve prijs (1.256 kwartieren < 0). Daarbij gaat 546 kWh aan
-  laadverlies verloren; zelfs gewaardeerd tegen de laagste prijs
-  (−500 EUR/MWh) is dat hooguit ~€270/jaar, ~3% van de LP-besparing.
-  Scenario B: 16 kwartieren, ook allemaal bij een negatieve prijs. Bewust
-  niet opgelost met binaries: het model blijft een LP, omdat een MILP over
-  35.040 kwartieren veel trager oplost en geen gegarandeerd globaal optimum
-  binnen praktische tijd geeft. Het effect is financieel klein en zichtbaar
-  gerapporteerd.
-- **BAT-9** — Eind-SoC ≥ begin-SoC (`initial_soc_fraction`) aan het eind
-  van de horizon. Zonder deze voorwaarde trekt de LP de batterij aan het
-  eind gratis leeg en telt die energie als besparing. De RBC heeft deze
-  voorwaarde niet (2023: eindigt op 208,8 kWh vs. 120,5 kWh begin, een
-  klein nadeel voor de RBC).
+**Battery**
+- **BAT-8** — Assumed that charging and discharging never happen simultaneously
+  because the solver always chooses the most efficient solution. **Checked
+  (2023 data): does not hold at negative prices.** Scenario A: 399 of the
+  35,032 quarter-hours with simultaneous charging and discharging, all at a
+  negative price (1,256 quarter-hours < 0). In those, 546 kWh is lost to
+  charging losses; even valued at the lowest price
+  (−500 EUR/MWh) that is at most ~€270/year, ~3% of the LP savings.
+  Scenario B: 16 quarter-hours, also all at a negative price. Deliberately
+  not solved with binaries: the model remains an LP, because a MILP over
+  35,040 quarter-hours solves much more slowly and does not give a guaranteed global optimum
+  within practical time. The effect is financially small and visibly
+  reported.
+- **BAT-9** — End SoC ≥ initial SoC (`initial_soc_fraction`) at the end
+  of the horizon. Without this condition, the LP drains the battery for free at the
+  end and counts that energy as savings. The RBC does not have this
+  condition (2023: ends at 208.8 kWh vs. 120.5 kWh at the start, a
+  small disadvantage for the RBC).
 
-## Belangrijke context, geen aanname
+## Important context, not an assumption
 
-*Context, geen aanname*: bij 99 kW blijft dit systeem onder de 100 kW-
-drempel waarboven een congestiemanagementcontract relevant wordt
-(RVO Flex-e-voorwaarden: vermogen van de maatregel, niet de
-aansluiting, is bepalend). Feitelijk gegeven, geen keuze — vermeld
-omdat het de 99 kW-keuze in een breder regulatoir kader plaatst.
+*Context, not an assumption*: at 99 kW, this system stays below the 100 kW
+threshold above which a congestion management contract becomes relevant
+(RVO Flex-e conditions: the power of the measure, not of the
+connection, is decisive). A factual given, not a choice — mentioned
+because it places the 99 kW choice in a broader regulatory context.

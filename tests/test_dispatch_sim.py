@@ -1,7 +1,7 @@
 """Tests for the rule-based dispatch (dispatch_sim.py).
 
-Draaien bewust met timestep_hours=0.25: bij uurdata is kWh == kW en
-blijven eenheidsfouten onzichtbaar (zie CLAUDE.md, Eenheden).
+Deliberately run with timestep_hours=0.25: with hourly data kWh == kW and
+unit errors stay invisible (see CLAUDE.md, Units).
 """
 
 import pandas as pd
@@ -10,7 +10,7 @@ import pytest
 from bess_office.config import BatteryConfig
 from bess_office.dispatch_sim import compute_dispatch_metrics, run_baseline_dispatch
 
-DT = 0.25  # uur per tijdstap (kwartier)
+DT = 0.25  # hours per timestep (quarter-hour)
 THRESHOLD_KW = 40.0
 
 
@@ -34,7 +34,7 @@ def test_rbc_discharges_above_threshold_and_not_below(battery):
 
     above = [lk > THRESHOLD_KW for lk in load_kw]
     assert (result.loc[above, "discharge_kwh"] > 0).all()
-    # Import teruggebracht tot precies de drempel (genoeg SoC beschikbaar).
+    # Import brought down to exactly the threshold (enough SoC available).
     assert result.loc[above, "grid_import_kwh"].div(DT).to_numpy() == pytest.approx(THRESHOLD_KW)
     below = [not a for a in above]
     assert (result.loc[below, "discharge_kwh"] == 0).all()
@@ -47,7 +47,7 @@ def test_metrics_report_peaks_in_kw(battery):
     result = run_baseline_dispatch(pv, load, battery, peak_threshold_kw=THRESHOLD_KW, timestep_hours=DT)
     metrics = compute_dispatch_metrics(result, peak_threshold_kw=THRESHOLD_KW, timestep_hours=DT)
 
-    assert metrics["peak_import_no_battery_kw"] == pytest.approx(60.0)  # niet 15 (kWh/kwartier)
+    assert metrics["peak_import_no_battery_kw"] == pytest.approx(60.0)  # not 15 (kWh/quarter-hour)
     assert metrics["peak_import_with_battery_kw"] == pytest.approx(THRESHOLD_KW)
 
 
@@ -57,7 +57,7 @@ def test_rbc_grid_charges_up_to_threshold(battery):
 
     result = run_baseline_dispatch(pv, load, battery, peak_threshold_kw=THRESHOLD_KW, timestep_hours=DT)
 
-    # Ruimte tot drempel: (40 - 20) kW x 0,25 h = 5 kWh, onder power (12,5 kWh/stap).
+    # Headroom to threshold: (40 - 20) kW x 0.25 h = 5 kWh, below power (12.5 kWh/step).
     assert result["charge_kwh"].to_numpy() == pytest.approx([5.0, 5.0])
     assert result["grid_import_kwh"].div(DT).to_numpy() == pytest.approx([THRESHOLD_KW, THRESHOLD_KW])
     initial_soc = battery.initial_soc_fraction * battery.capacity_kwh
@@ -69,7 +69,7 @@ def test_rbc_grid_charging_respects_power_and_max_soc():
     load = _series([0.0, 0.0])
     pv = _series([0.0, 0.0])
 
-    # Ruimte tot drempel 40 kW x 0,25 = 10 kWh, maar power is 20 kW -> 5 kWh/stap.
+    # Headroom to threshold 40 kW x 0.25 = 10 kWh, but power is 20 kW -> 5 kWh/step.
     small = BatteryConfig(capacity_kwh=100.0, power_kw=20.0)
     result = run_baseline_dispatch(pv, load, small, peak_threshold_kw=THRESHOLD_KW, timestep_hours=DT)
     assert result["charge_kwh"].to_numpy() == pytest.approx([5.0, 5.0])
@@ -88,7 +88,7 @@ def test_rbc_import_never_exceeds_threshold_with_enough_soc(battery):
     result = run_baseline_dispatch(pv, load, battery, peak_threshold_kw=THRESHOLD_KW, timestep_hours=DT)
 
     assert result["grid_import_kwh"].div(DT).max() <= THRESHOLD_KW + 1e-9
-    # Energiebalans sluit per stap.
+    # Energy balance closes per step.
     balance = (
         result["pv_kwh"] + result["discharge_kwh"] + result["grid_import_kwh"]
         - result["load_kwh"] - result["charge_kwh"] - result["grid_export_kwh"]

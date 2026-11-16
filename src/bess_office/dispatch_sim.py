@@ -94,8 +94,8 @@ def run_baseline_dispatch(
 
         else:
             deficit = -surplus
-            # deficit is kWh per tijdstap, de drempel is kW -- expliciet
-            # omrekenen (zie CLAUDE.md, Eenheden).
+            # deficit is kWh per timestep, the threshold is kW -- convert
+            # explicitly (see CLAUDE.md, Units).
             if deficit / timestep_hours > peak_threshold_kw:
                 # Peak shaving: discharge to bring import down to the
                 # threshold, limited by power rating and available SoC.
@@ -105,10 +105,10 @@ def run_baseline_dispatch(
                 soc -= discharge
 
         if discharge == 0:
-            # Grid charging (ARCH-3): import zit onder de drempel -> bijladen
-            # vanaf het net met hooguit de resterende ruimte tot de drempel,
-            # begrensd door vermogen (minus wat al van PV geladen wordt) en
-            # max SoC. Zelfde laadverlies als bij PV-laden (BAT-2).
+            # Grid charging (ARCH-3): import is below the threshold -> top up
+            # from the grid with at most the remaining headroom to the threshold,
+            # limited by power (minus what is already being charged from PV) and
+            # max SoC. Same charging loss as for PV charging (BAT-2).
             current_import = max(0.0, load + charge - pv)
             headroom = peak_threshold_kw * timestep_hours - current_import
             room_in_battery = (max_soc - soc) / charge_efficiency
@@ -161,7 +161,7 @@ def compute_dispatch_metrics(
         Peaks in kW (``*_kw``), self-consumption in percent (``*_pct``).
     """
     naive_import = (result["load_kwh"] - result["pv_kwh"]).clip(lower=0)
-    # kWh per tijdstap -> kW
+    # kWh per timestep -> kW
     peak_no_battery = naive_import.max() / timestep_hours
     peak_with_battery = result["grid_import_kwh"].max() / timestep_hours
     peak_shaved = peak_no_battery - peak_with_battery
@@ -194,8 +194,8 @@ if __name__ == "__main__":
     # Isolated logic test with synthetic, perfectly-aligned data.
     # This checks the dispatch RULES, not real-world data integration
     # (timezones, resampling, index alignment) -- that happens in main.py.
-    # Uurdata (timestep 1.0): kWh == kW, dus eenheidsfouten zijn hier niet
-    # zichtbaar -- daarvoor zijn de pytest-tests met timestep 0.25.
+    # Hourly data (timestep 1.0): kWh == kW, so unit errors are not
+    # visible here -- that is what the pytest tests with timestep 0.25 are for.
     import numpy as np
 
     hours = pd.date_range("2023-06-01", periods=24, freq="1h")

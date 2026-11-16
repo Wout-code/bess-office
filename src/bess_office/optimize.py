@@ -26,17 +26,17 @@ conda-forge coincbc`, or download a CBC binary) or HiGHS (`pip install
 highspy`, then SolverFactory("appsi_highs")). This file defaults to CBC.
 """
 
-# Open, nog niet opgelost in dit bestand (zie ASSUMPTIONS.md):
-# - BAT-7: asymmetrisch laad-/ontlaadvermogen nog niet verwerkt, power_kw
-#   wordt nog voor beide richtingen gebruikt.
-# - BAT-3: geen degradatiekost -- de solver ziet cyclen als gratis. Dit is
-#   ook de reden voor de negatieve-prijzen-loophole: zonder een kost op
-#   doorstroom kan gelijktijdig laden/ontladen bij prijs < 0 fysisch
-#   onzinnig maar LP-optimaal lijken.
-# - BAT-4: geen minimale aan/uit-tijd, batterij kan elk kwartier wisselen.
-# - GTV/jaarlijkse-overschrijding-component (zie config.py GridTariffConfig)
-#   wordt NIET gemodelleerd -- bewuste vereenvoudiging, zie daar voor
-#   details en de TODO om dit later toe te voegen.
+# Open, not yet resolved in this file (see ASSUMPTIONS.md):
+# - BAT-7: asymmetric charge/discharge power not yet implemented, power_kw
+#   is still used for both directions.
+# - BAT-3: no degradation cost -- the solver sees cycling as free. This is
+#   also the reason for the negative-price loophole: without a cost on
+#   throughput, simultaneous charging/discharging at price < 0 can look
+#   physically nonsensical but LP-optimal.
+# - BAT-4: no minimum on/off time, the battery can switch every quarter-hour.
+# - GTV/annual-exceedance component (see config.py GridTariffConfig)
+#   is NOT modeled -- deliberate simplification, see there for
+#   details and the TODO to add this later.
 
 import pandas as pd
 import pyomo.environ as pyo
@@ -113,10 +113,10 @@ def run_lp_dispatch(
     pv = pv_kwh.to_numpy()
     load = load_kwh.to_numpy()
 
-    # Kalendermaand per tijdstap, voor de maandpiek-constraint. timestamps
-    # zijn al tz-aware Europe/Amsterdam (zie ASSUMPTIONS.md DATA-1), dus dit
-    # volgt lokale kloktijd, niet UTC -- consistent met hoe het tarief in
-    # werkelijkheid wordt afgerekend.
+    # Calendar month per timestep, for the monthly peak constraint. timestamps
+    # are already tz-aware Europe/Amsterdam (see ASSUMPTIONS.md DATA-1), so this
+    # follows local clock time, not UTC -- consistent with how the tariff is
+    # billed in reality.
     months = pd.Series(timestamps).dt.to_period("M").astype(str)
     unique_months = sorted(months.unique())
 
@@ -135,33 +135,33 @@ def run_lp_dispatch(
     model.soc = pyo.Var(model.T, bounds=(min_soc, max_soc))
     model.grid_import = pyo.Var(model.T, bounds=(0, None))
     model.grid_export = pyo.Var(model.T, bounds=(0, None))
-    # Eén piek-variabele per kalendermaand -- modelleert Liander's "kW max.
-    # mnd"-component (zie config.py). Geen floor tegen een gecontracteerd
-    # vermogen: die GTV-component is in dit vereenvoudigde model niet
-    # meegenomen.
+    # One peak variable per calendar month -- models Liander's "kW max.
+    # mnd" component (see config.py). No floor at a contracted
+    # power: that GTV component is not included in this simplified
+    # model.
     model.peak_import_kw = pyo.Var(model.M, bounds=(0, None))
 
     def soc_rule(m, t):
         prev_soc = initial_soc if t == 0 else m.soc[t - 1]
-        # laadverlies zit alleen bij het laden (ASSUMPTIONS.md BAT-2)
+        # charging loss occurs only when charging (ASSUMPTIONS.md BAT-2)
         return m.soc[t] == prev_soc + m.charge[t] * battery.round_trip_efficiency - m.discharge[t]
 
     model.soc_dynamics = pyo.Constraint(model.T, rule=soc_rule)
 
-    # Eind-SoC minstens begin-SoC (BAT-9): anders trekt de LP de batterij aan
-    # het eind van de horizon gratis leeg en telt die energie als winst.
+    # End SoC at least initial SoC (BAT-9): otherwise the LP drains the battery
+    # for free at the end of the horizon and counts that energy as profit.
     model.terminal_soc = pyo.Constraint(expr=model.soc[len(timestamps) - 1] >= initial_soc)
 
     def balance_rule(m, t):
-        # (load + charge) gedekt door (pv + discharge + import), rest export.
+        # (load + charge) covered by (pv + discharge + import), remainder exported.
         return load[t] + m.charge[t] == pv[t] + m.discharge[t] + m.grid_import[t] - m.grid_export[t]
 
     model.energy_balance = pyo.Constraint(model.T, rule=balance_rule)
 
     def peak_rule(m, t):
-        # peak_import_kw van de maand waar tijdstap t in valt moet minstens
-        # deze import zijn -- de solver drukt 'm zo laag mogelijk per maand,
-        # want elke maand kost apart geld in de objective.
+        # peak_import_kw of the month that timestep t falls in must be at least
+        # this import -- the solver pushes it as low as possible per month,
+        # because each month costs money separately in the objective.
         month = months.iloc[t]
         return m.peak_import_kw[month] >= m.grid_import[t] / timestep_hours
 
@@ -171,9 +171,9 @@ def run_lp_dispatch(
         energy_cost = sum(
             (m.grid_import[t] - m.grid_export[t]) * prices_eur_kwh[t]
             + m.grid_import[t] * grid_tariff.transport_tariff_eur_per_kwh
-            # energiebelasting alleen op import, geen saldering (NET-5)
+            # energy tax only on import, no net metering (NET-5)
             + m.grid_import[t] * grid_tariff.energy_tax_eur_per_kwh
-            # scenario B: belasting op alles wat de batterij in gaat (NET-6)
+            # scenario B: tax on everything that goes into the battery (NET-6)
             + m.charge[t] * grid_tariff.storage_charge_tax_eur_per_kwh
             for t in m.T
         )
@@ -187,7 +187,7 @@ def run_lp_dispatch(
 
     if solver_result.solver.termination_condition != pyo.TerminationCondition.optimal:
         raise RuntimeError(
-            f"LP niet optimaal opgelost: {solver_result.solver.termination_condition}"
+            f"LP not solved to optimality: {solver_result.solver.termination_condition}"
         )
 
     records = []
@@ -209,9 +209,9 @@ def run_lp_dispatch(
 
 
 if __name__ == "__main__":
-    # Kleine, synthetische test -- eigen __main__-blok: losse logica-check
-    # met kleine, verifieerbare data, geen echte databronnen. Dekt meerdere
-    # maanden, anders test je de maandpiek-logica niet zinnig.
+    # Small, synthetic test -- own __main__ block: standalone logic check
+    # with small, verifiable data, no real data sources. Covers multiple
+    # months, otherwise the monthly peak logic is not meaningfully tested.
     import numpy as np
 
     hours = pd.date_range("2023-06-25", periods=24 * 10, freq="1h", tz="Europe/Amsterdam")
@@ -235,8 +235,8 @@ if __name__ == "__main__":
 
     battery = BatteryConfig(capacity_kwh=10, power_kw=5)
     grid_tariff = GridTariffConfig(
-        transport_tariff_eur_per_kwh=0.02,       # placeholder, NIET een echt Liander-tarief
-        monthly_peak_tariff_eur_per_kw=5.0,      # placeholder, NIET een echt Liander-tarief
+        transport_tariff_eur_per_kwh=0.02,       # placeholder, NOT a real Liander tariff
+        monthly_peak_tariff_eur_per_kw=5.0,      # placeholder, NOT a real Liander tariff
     )
 
     result = run_lp_dispatch(pv, load, prices, battery, grid_tariff, timestep_hours=1.0)
@@ -249,6 +249,6 @@ if __name__ == "__main__":
     monthly_peak = (result["grid_import_kwh"] / 1.0).groupby(result.index.to_period("M")).max()
     peak_cost = monthly_peak.sum() * grid_tariff.monthly_peak_tariff_eur_per_kw
 
-    print(f"\nPiek-import per maand (kW):\n{monthly_peak}")
-    print(f"\nEnergie- + transportkosten: €{energy_cost.sum():.2f}")
-    print(f"Piekkosten (alle maanden):  €{peak_cost:.2f}")
+    print(f"\nPeak import per month (kW):\n{monthly_peak}")
+    print(f"\nEnergy + transport cost: €{energy_cost.sum():.2f}")
+    print(f"Peak cost (all months):  €{peak_cost:.2f}")

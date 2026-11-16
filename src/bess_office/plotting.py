@@ -4,24 +4,24 @@ from pathlib import Path
 
 import matplotlib
 
-matplotlib.use("Agg")  # alleen naar bestand schrijven, geen scherm nodig
+matplotlib.use("Agg")  # write to file only, no display needed
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 
-# Categorische kleuren in vaste volgorde (dataviz-referentiepalet, light mode).
+# Categorical colours in fixed order (dataviz reference palette, light mode).
 SURFACE = "#fcfcfb"
 TEXT_PRIMARY = "#0b0b0b"
 TEXT_SECONDARY = "#52514e"
 GRID = "#e4e3df"
 
-# (sleutel in compute_financial_metrics, label, kleur). Volgorde = stapelvolgorde.
+# (key in compute_financial_metrics, label, colour). Order = stacking order.
 COST_COMPONENTS = [
-    ("import_cost_eur", "Energie (day-ahead)", "#2a78d6"),
-    ("energy_tax_cost_eur", "Energiebelasting", "#eb6834"),
+    ("import_cost_eur", "Energy (day-ahead)", "#2a78d6"),
+    ("energy_tax_cost_eur", "Energy tax", "#eb6834"),
     ("transport_cost_eur", "Transport", "#1baf7a"),
-    ("peak_cost_eur", "Maandpiek", "#eda100"),
+    ("peak_cost_eur", "Monthly peak", "#eda100"),
 ]
-EXPORT_COMPONENT = ("export_revenue_eur", "Export (aftrek)", "#e87ba4")
+EXPORT_COMPONENT = ("export_revenue_eur", "Export (deduction)", "#e87ba4")
 
 
 def _eur(value: float, _pos=None) -> str:
@@ -55,23 +55,23 @@ def plot_cost_breakdown(financials: dict[str, dict], path: Path) -> Path:
     fig, ax = plt.subplots(figsize=(8, 5.5), facecolor=SURFACE)
     ax.set_facecolor(SURFACE)
 
-    # Kosten boven nul gestapeld; 2 px oppervlakte-rand geeft scheiding tussen segmenten.
+    # Costs stacked above zero; a 2 px surface-coloured edge separates the segments.
     bottoms = [0.0] * len(labels)
     for key, label, color in COST_COMPONENTS:
         values = [financials[s][key] for s in labels]
         ax.bar(x, values, width, bottom=bottoms, color=color, label=label, edgecolor=SURFACE, linewidth=2)
         bottoms = [b + v for b, v in zip(bottoms, values)]
 
-    # Export als aftrek: negatief segment onder de nullijn.
+    # Export as a deduction: negative segment below the zero line.
     key, label, color = EXPORT_COMPONENT
     exports = [-financials[s][key] for s in labels]
     ax.bar(x, exports, width, color=color, label=label, edgecolor=SURFACE, linewidth=2)
 
-    # Netto kosten als getal boven de staaf.
+    # Net cost as a number above the bar.
     for i, s in enumerate(labels):
         net = financials[s]["net_cost_eur"]
         ax.annotate(
-            f"netto €{net:,.0f}".replace(",", "."),
+            f"net €{net:,.0f}",
             xy=(i, bottoms[i]),
             xytext=(0, 6),
             textcoords="offset points",
@@ -94,15 +94,15 @@ def plot_cost_breakdown(financials: dict[str, dict], path: Path) -> Path:
     ax.spines["bottom"].set_visible(False)
     ax.set_ylim(min(exports) * 1.6, max(bottoms) * 1.12)
 
-    ax.set_ylabel("EUR per jaar", color=TEXT_SECONDARY)
+    ax.set_ylabel("EUR per year", color=TEXT_SECONDARY)
     ax.set_title(
-        "Jaarkosten per component (2023-data, tarieven indicatief)",
+        "Annual cost per component (2023 data, tariffs indicative)",
         color=TEXT_PRIMARY,
         loc="left",
         fontsize=12,
     )
-    # Legenda in dezelfde volgorde als de stapel van boven naar beneden:
-    # kostencomponenten omgekeerd, export (onder nul) als laatste.
+    # Legend in the same order as the stack from top to bottom:
+    # cost components reversed, export (below zero) last.
     handles, legend_labels = ax.get_legend_handles_labels()
     order = list(range(len(COST_COMPONENTS)))[::-1] + [len(COST_COMPONENTS)]
     ax.legend(

@@ -43,7 +43,7 @@ def get_day_ahead_prices(
     raw_path = RAW_DATA_DIR / f"entsoe_prices_{country_code}_{start.date()}_{end.date()}.csv"
 
     if raw_path.exists():
-        print(f"Al lokaal aanwezig, laad van schijf: {raw_path}")
+        print(f"Already available locally, loading from disk: {raw_path}")
         df = pd.read_csv(raw_path, index_col=0)
         df.index = pd.to_datetime(df.index, utc=True).tz_convert("Europe/Amsterdam")
         prices = df["price_eur_mwh"]
@@ -63,10 +63,10 @@ def get_day_ahead_prices(
             prices.to_csv(raw_path, header=["price_eur_mwh"])
             print(f"Saved raw prices to {raw_path}")
 
-    # Zelfde conventie als fetch_load.py/fetch_pv.py: tz-aware,
-    # Europe/Amsterdam. ENTSO-E levert dit al zo bij een verse fetch;
-    # deze regel garandeert dat de cache-route (na CSV-round-trip)
-    # hetzelfde resultaat geeft, ook rond de klokwissel.
+    # Same convention as fetch_load.py/fetch_pv.py: tz-aware,
+    # Europe/Amsterdam. ENTSO-E already supplies it this way on a fresh fetch;
+    # this line guarantees that the cache route (after a CSV round trip)
+    # gives the same result, also around the clock change.
     prices.index = prices.index.tz_convert("Europe/Amsterdam")
 
     return prices
@@ -79,5 +79,5 @@ if __name__ == "__main__":
 
     prices = get_day_ahead_prices(start, end)
     print(prices.head())
-    resolution = prices.index[1] - prices.index[0] if len(prices) > 1 else "onbekend"
+    resolution = prices.index[1] - prices.index[0] if len(prices) > 1 else "unknown"
     print(f"\nFetched {len(prices)} prices at {resolution} resolution.")

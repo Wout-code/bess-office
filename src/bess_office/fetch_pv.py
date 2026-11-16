@@ -28,9 +28,9 @@ def get_pv_profile(pv_config: PVConfig | None = None) -> pd.Series:
         pv_config = CONFIG.pv
 
     raw_dir = CONFIG.data_dir / "raw"
-    # Alle parameters die de PVGIS-respons bepalen horen in de bestandsnaam.
-    # Anders wordt na een configwijziging (bv. peak_power_kw) stilzwijgend
-    # een oude cache geladen die niet meer bij de config past.
+    # All parameters that determine the PVGIS response belong in the file name.
+    # Otherwise, after a config change (e.g. peak_power_kw), an old cache that
+    # no longer matches the config is silently loaded.
     raw_path = raw_dir / (
         f"pvgis_{pv_config.latitude}_{pv_config.longitude}_{pv_config.year}"
         f"_{pv_config.peak_power_kw}kWp_tilt{pv_config.tilt}_az{pv_config.azimuth}"
@@ -38,9 +38,9 @@ def get_pv_profile(pv_config: PVConfig | None = None) -> pd.Series:
     )
 
     if raw_path.exists():
-        print(f"Al lokaal aanwezig, laad van schijf: {raw_path}")
+        print(f"Already available locally, loading from disk: {raw_path}")
         data = pd.read_csv(raw_path, index_col=0)
-        data.index = pd.to_datetime(data.index, utc=True)  # blijft UTC; conversie gebeurt hieronder, gedeeld voor beide paden
+        data.index = pd.to_datetime(data.index, utc=True)  # stays UTC; conversion happens below, shared by both paths
     else:
         data, meta = get_pvgis_hourly(
             latitude=pv_config.latitude,
@@ -63,14 +63,14 @@ def get_pv_profile(pv_config: PVConfig | None = None) -> pd.Series:
     series = data["P"]
     idx = pd.to_datetime(series.index)
     if idx.tz is None:
-        idx = idx.tz_localize("UTC")  # PVGIS levert UTC-gebaseerde tijdstempels
-    idx = idx.round("h")  # afronden terwijl nog in UTC -- geen DST-ambiguiteit
-    series.index = idx.tz_convert("Europe/Amsterdam")  # pas hierna omzetten
+        idx = idx.tz_localize("UTC")  # PVGIS supplies UTC-based timestamps
+    idx = idx.round("h")  # round while still in UTC -- no DST ambiguity
+    series.index = idx.tz_convert("Europe/Amsterdam")  # only convert after that
     return series
 
 
 if __name__ == "__main__":
-    pv = get_pv_profile()  # gebruikt gewoon CONFIG.pv
+    pv = get_pv_profile()  # simply uses CONFIG.pv
     print(pv.head())
     print(f"\nTotal rows: {len(pv)}")
     print(f"Total annual yield: {pv.sum() / 1000:.0f} kWh")
