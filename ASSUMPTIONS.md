@@ -63,15 +63,11 @@ rekenmodel je gebruikt.
 
 **DATA-7 — Load-profiel afvlakking (Gelijktijdigheid)**
 - Omdat het Liander K&O-profiel een wiskundig gemiddelde is van honderden
-  panden, is de curve afgevlakt (gelijktijdigheidsfactor). De
-  vlijmscherpe, kortstondige vermogenspieken en de diepe nul-verbruik
-  dalen van een individueel fysiek gebouw ontbreken. Voor het
-  LP-optimalisatiemodel betekent dit dat peak shaving waarschijnlijk
-  efficiënter en goedkoper wordt ingeschat dan in werkelijkheid: een
-  brede, lagere piek is voor de batterij eenvoudiger weg te werken dan
-  een grillige naaldpiek. Het berekende financiële rendement voor de
-  geoptimaliseerde piek-drempel is hierdoor een robuuste benadering, maar
-  valt in de fysieke realiteit mogelijk iets conservatiever uit.
+  panden, is de curve afgevlakt (gelijktijdigheidsfactor). De pieken van
+  een echt pand zijn hoger, dus de waarde van piekverlaging wordt in dit
+  model waarschijnlijk onderschat. Die echte pieken zijn wel kort en
+  grillig, en daardoor in de praktijk lastiger te voorspellen en weg te
+  werken dan hier met een perfecte voorspelling (TIME-2).
 
 **DATA-8 — Referentiepand, grootverbruik-schaal**
 - 4.500 m² i.p.v. 590 m², annual_kwh_per_m2 ongewijzigd (115 kWh/m²/jaar,
@@ -136,19 +132,17 @@ rekenmodel je gebruikt.
   zie BAT-7)
 - **BAT-2** — Ontladen is verliesvrij, laadverlies zit alleen bij het laden
 - **BAT-3** — Geen degradatie over tijd — capaciteit/efficiëntie blijven
-  constant (Sigenergy-garantie: 70% na 10 jaar/3.048 cycli, relevant
-  zodra dit naar een meerjarige projectie gaat — LET OP: deze garantie
-  hoort bij de oude SigenStor-keuze; nog te verifiëren voor de BOLT-241,
-  zie DATA-9)
+  constant.
   Degradatie zit daarom ook bewust **niet** in de LP-objective (geen
   cycluskost). Onderbouwing: gemeten equivalente volle cycli/jaar
   (`main.py`, 2023-data) zijn RBC 102, LP scenario A 487 (1,33/dag), LP
   scenario B 264. Dat staat tegenover ≥ 6000 cycli voor de BOLT-241 (opgave,
-  niet geverifieerd, zie DATA-9): zelfs bij 487/jaar ~12 jaar. Bovendien
-  is de C-rate 99 kW / 241 kWh ≈ 0,41C, een mild regime waarin
-  kalenderveroudering domineert over cyclusstress (Wang et al., 2011:
-  onder ~0,5C is cyclusdiepte niet meer de dominante schadeoorzaak). Een cycluskost in de objective is een mogelijke uitbreiding,
-  niet geïmplementeerd.
+  niet geverifieerd, zie DATA-9): zelfs bij 487/jaar ~12 jaar. Bij lage
+  C-rates bepalen vooral tijd, temperatuur en doorgezette lading de
+  veroudering, en nauwelijks de cyclusdiepte (DoD) (Wang et al., 2011);
+  hun tests begonnen bij C/2, dit systeem draait op 99 kW / 241 kWh ≈ 0,41C.
+  Een DoD-afhankelijke kost is daarom niet nodig; een kost per doorgezette
+  kWh wel, maar die is niet geïmplementeerd.
 - **BAT-4** — Geen minimale aan/uit-tijd — batterij schakelt vrij
 - **BAT-5** — Efficiëntie/capaciteit constant, ongeacht SoC, laadsnelheid
   of temperatuur

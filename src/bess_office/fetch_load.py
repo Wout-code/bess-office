@@ -5,7 +5,7 @@ Liander's K&O profiles are static, manually downloaded CSV files.
 Download from https://www.liander.nl/over-ons/open-data -> "K&O profielen",
 and place the file in data/raw/ before running this.
 
-Verified file structure (see notebooks/0.2-load-exploration.ipynb):
+Verified file structure:
 - Separator: semicolon (;), decimal: period
 - Two columns: DATUM_TIJDSTIP (real datetime), WAARDE (single relative value)
 - 35,040 rows = 365 days x 96 quarter-hours (complete year, no gaps)
@@ -73,7 +73,7 @@ def get_relative_profile() -> pd.Series:
 
     # Re-normalize to the profile's own max, so peak_kwh_per_quarter is
     # reached exactly at the profile's peak moment (observed max was
-    # 0.9, not a clean 1.0 -- see exploration notebook).
+    # 0.9, not a clean 1.0).
     relative_profile = df["WAARDE"] / df["WAARDE"].max()
 
     return relative_profile

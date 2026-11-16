@@ -57,7 +57,7 @@ class BuildingConfig:
     #   get_relative_profile().sum(): 20.824,42
     #   4.500 m2 x 115 kWh/m2/jaar = 517.500 kWh/jaar
     #   -> peak_kwh_per_quarter = 517.500 / 20.824,42 = 24,85 kWh/kwartier
-    #   -> piek = 99,4 kW  (geverifieerd, zie notebook-run)
+    #   -> piek = 99,4 kW  (geverifieerd via get_relative_profile().sum())
     area_m2: float = 4500.0
     annual_kwh_per_m2: float = 115.0    # NL-gemiddelde, bandbreedte 100-150 (Energy Shift)
     # peak_kwh_per_quarter staat hier bewust niet -- het is geen zuivere
@@ -86,10 +86,10 @@ class GridTariffConfig:
     """
     Netbeheerder-transportkosten -- BEWUST VEREENVOUDIGD, zie onder.
 
-    Liander's werkelijke tariefstructuur voor grootverbruik (geverifieerd
-    tegen "tarieven voor aansluiting en transport elektriciteit 2026",
-    deelmarkt MS/LS > 50 t/m 136 kW, van toepassing op ~99,4 kW) bevat TWEE
-    aparte capaciteitscomponenten:
+    De tariefSTRUCTUUR komt uit de Liander-PDF "tarieven voor aansluiting
+    en transport elektriciteit 2026" (deelmarkt MS/LS > 50 t/m 136 kW, van
+    toepassing op ~99,4 kW); de GETALLEN hieronder zijn niet geverifieerd
+    (zie TODO). Volgens die PDF zijn er TWEE aparte capaciteitscomponenten:
       1. "kW contract" -- jaarlijks GTV-tarief over je gecontracteerde
          vermogen; overschrijding verhoogt je GTV automatisch voor het hele
          kalenderjaar (geen apart boetetarief).
@@ -109,9 +109,8 @@ class GridTariffConfig:
       onderling inconsistente cijfers voor dezelfde deelmarkt. Controleer
       zelf de exacte tabel in:
       https://www.liander.nl/-/media/files/tarieven/grootzakelijk/tarieven-2026/tarieven-voor-aansluiting-en-transport-elektriciteit-2026_2.pdf
-    - Zodra geverifieerd: component 1 (GTV) alsnog toevoegen aan het model
-      (zie de oudere versie van dit bestand / het overzicht-document voor
-      hoe dat eruitzag: een peak_floor-constraint op een jaarlijkse piek).
+    - Zodra geverifieerd: component 1 (GTV) alsnog toevoegen aan het model,
+      bv. als een peak_floor-constraint op een jaarlijkse piek.
     """
     # Component: transporttarief over het totale jaarvolume, kWh -- geen
     # piek-relatie. SCHATTING, niet geverifieerd: €0,0226/kWh (deelmarkt
