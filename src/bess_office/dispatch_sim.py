@@ -13,6 +13,10 @@ Two value drivers are combined, matching what an office building
    grid import would otherwise exceed a configured peak threshold,
    since MKB capacity tariffs are billed on the highest measured
    quarter-hour peak in a billing period.
+3. Grid charging (ARCH-3): whenever grid import stays below the peak
+   threshold, top the battery up from the grid with at most the
+   remaining headroom to the threshold, so it is full before the next
+   peak. Still price-agnostic (ARCH-1).
 
 Battery model: single capacity/power pair, round-trip efficiency
 applied on charge only (discharge assumed lossless on the way out --
@@ -98,6 +102,18 @@ def run_baseline_dispatch(
                 available_energy = soc - min_soc
                 discharge = min(shave_target, max_energy_per_step, available_energy)
                 soc -= discharge
+
+        if discharge == 0:
+            # Grid charging (ARCH-3): import zit onder de drempel -> bijladen
+            # vanaf het net met hooguit de resterende ruimte tot de drempel,
+            # begrensd door vermogen (minus wat al van PV geladen wordt) en
+            # max SoC. Zelfde laadverlies als bij PV-laden (BAT-2).
+            current_import = max(0.0, load + charge - pv)
+            headroom = peak_threshold_kw * timestep_hours - current_import
+            room_in_battery = (max_soc - soc) / charge_efficiency
+            grid_charge = max(0.0, min(headroom, max_energy_per_step - charge, room_in_battery))
+            charge += grid_charge
+            soc += grid_charge * charge_efficiency
 
         # Full energy balance: (load + charge) must be met by
         # (pv + discharge + grid_import), with any leftover exported.
