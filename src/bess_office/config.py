@@ -124,6 +124,17 @@ class GridTariffConfig:
     # €3,57/kW/maand (deelmarkt MS/LS > 50 t/m 136 kW).
     monthly_peak_tariff_eur_per_kw: float | None = 3.57
 
+    # Energiebelasting (NET-5): vast tarief per geïmporteerde kWh, marginale
+    # schijf 50.000-10 mln kWh, 2026, excl. btw. Alleen op import, geen
+    # saldering bij grootverbruik. De hogere tarieven van de eerste
+    # 50.000 kWh zijn een vaste kost en niet beslissingsrelevant.
+    energy_tax_eur_per_kwh: float = 0.03735
+
+    # Hypothetische dubbele energiebelasting op opslag (NET-6), per kWh die de
+    # batterij in gaat (charge_kwh, dus ook PV-laden: bovengrens).
+    # 0.0 = scenario A (basis); gelijk aan energy_tax_eur_per_kwh = scenario B.
+    storage_charge_tax_eur_per_kwh: float = 0.0
+
     # Niet gebruikt in het huidige vereenvoudigde model -- bewaard voor
     # wanneer component 1 (GTV/jaarlijkse overschrijding) wordt toegevoegd.
     # SCHATTING, niet geverifieerd: €3,74/kW/maand voor het GTV-tarief.

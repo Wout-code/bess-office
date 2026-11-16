@@ -80,9 +80,12 @@ def run_lp_dispatch(
         power (BAT-7, see ASSUMPTIONS.md) is not yet split into separate
         limits here -- power_kw is still used for both directions.
     grid_tariff : GridTariffConfig
-        Two components used here (see config.py docstring for the full
+        Components used here (see config.py docstring for the full
         picture and what is deliberately left out):
         - transport_tariff_eur_per_kwh: EUR per kWh of grid import.
+        - energy_tax_eur_per_kwh: EUR per kWh of grid import (NET-5).
+        - storage_charge_tax_eur_per_kwh: EUR per kWh charged into the
+          battery; 0.0 except in the storage double-tax scenario (NET-6).
         - monthly_peak_tariff_eur_per_kw: EUR per kW of the highest
           import in a calendar month, charged separately per month
           (Liander's "kW max. mnd" component). The GTV/annual-contract
@@ -175,6 +178,10 @@ def run_lp_dispatch(
         energy_cost = sum(
             (m.grid_import[t] - m.grid_export[t]) * prices_eur_kwh[t]
             + m.grid_import[t] * grid_tariff.transport_tariff_eur_per_kwh
+            # energiebelasting alleen op import, geen saldering (NET-5)
+            + m.grid_import[t] * grid_tariff.energy_tax_eur_per_kwh
+            # scenario B: belasting op alles wat de batterij in gaat (NET-6)
+            + m.charge[t] * grid_tariff.storage_charge_tax_eur_per_kwh
             for t in m.T
         )
         peak_cost = sum(m.peak_import_kw[month] for month in m.M) * grid_tariff.monthly_peak_tariff_eur_per_kw

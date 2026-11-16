@@ -12,6 +12,8 @@ vergelijking tussen de regelgebaseerde baseline (RBC, dispatch_sim.py) en
 de LP-optimalisatie (optimize.py), op zowel piekreductie als euro's.
 """
 
+import dataclasses
+
 import numpy as np
 import pandas as pd
 
@@ -43,6 +45,8 @@ def compute_financial_metrics(
     import_cost = (result["grid_import_kwh"] * prices_eur_kwh).sum()  # ARCH-5
     export_revenue = (result["grid_export_kwh"] * prices_eur_kwh).sum()
     transport_cost = result["grid_import_kwh"].sum() * grid_tariff.transport_tariff_eur_per_kwh
+    energy_tax_cost = result["grid_import_kwh"].sum() * grid_tariff.energy_tax_eur_per_kwh  # NET-5
+    storage_tax_cost = result["charge_kwh"].sum() * grid_tariff.storage_charge_tax_eur_per_kwh  # NET-6
 
     # Maandpiek-kost: zelfde formule als optimize.py's objective (Liander's
     # "kW max. mnd"-component, zie config.py GridTariffConfig-docstring).
@@ -54,10 +58,21 @@ def compute_financial_metrics(
         "import_cost_eur": import_cost,
         "export_revenue_eur": export_revenue,
         "transport_cost_eur": transport_cost,
+        "energy_tax_cost_eur": energy_tax_cost,
+        "storage_tax_cost_eur": storage_tax_cost,
         "peak_cost_eur": peak_cost,
-        "net_cost_eur": import_cost + transport_cost + peak_cost - export_revenue,
+        "net_cost_eur": (
+            import_cost + transport_cost + energy_tax_cost + storage_tax_cost + peak_cost - export_revenue
+        ),
         "monthly_peak_kw": monthly_peak_kw,
     }
+
+
+def equivalent_full_cycles(result: pd.DataFrame, battery: BatteryConfig) -> float:
+    """Equivalent full cycles over the result's horizon: total discharged
+    energy divided by the usable capacity (max - min SoC)."""
+    usable_kwh = (battery.max_soc_fraction - battery.min_soc_fraction) * battery.capacity_kwh
+    return result["discharge_kwh"].sum() / usable_kwh
 
 
 def select_rbc_threshold(
@@ -110,6 +125,8 @@ def print_dispatch_report(label: str, result: pd.DataFrame, metrics: dict, finan
     print(f"Import cost ({label}):     €{financials['import_cost_eur']:.2f}")
     print(f"Export revenue ({label}):  €{financials['export_revenue_eur']:.2f}")
     print(f"Transport cost ({label}):  €{financials['transport_cost_eur']:.2f}")
+    print(f"Energy tax ({label}):      €{financials['energy_tax_cost_eur']:.2f}")
+    print(f"Storage tax ({label}):     €{financials['storage_tax_cost_eur']:.2f}")
     print(f"Peak/capacity cost ({label}): €{financials['peak_cost_eur']:.2f}")
     print(f"Net cost ({label}):        €{financials['net_cost_eur']:.2f}")
     print()
@@ -232,6 +249,32 @@ def main() -> None:
         f"{rbc_metrics['peak_import_with_battery_kw'] - lp_metrics['peak_import_with_battery_kw']:.2f} kW"
     )
     print(f"Kostenbesparing LP t.o.v. RBC: €{cost_savings:.2f} ({cost_savings_pct:.1f}%)")
+    print(
+        f"Equivalente volle cycli/jaar: RBC {equivalent_full_cycles(rbc_result, CONFIG.battery):.0f}, "
+        f"LP {equivalent_full_cycles(lp_result, CONFIG.battery):.0f}"
+    )
+    print()
+
+    # --- Scenario B: hypothetische dubbele energiebelasting op opslag (NET-6) ---
+    # De RBC is prijsloos (ARCH-1): zijn dispatch blijft gelijk, alleen de
+    # kosten worden herberekend. De LP wordt opnieuw opgelost.
+    tariff_b = dataclasses.replace(
+        CONFIG.grid_tariff, storage_charge_tax_eur_per_kwh=CONFIG.grid_tariff.energy_tax_eur_per_kwh
+    )
+    rbc_financials_b = compute_financial_metrics(rbc_result, prices_quarter, tariff_b, CONFIG.sim.timestep_hours)
+    lp_result_b = run_lp_dispatch(
+        pv_quarter, load, prices_quarter, CONFIG.battery, tariff_b, timestep_hours=CONFIG.sim.timestep_hours
+    )
+    lp_financials_b = compute_financial_metrics(lp_result_b, prices_quarter, tariff_b, CONFIG.sim.timestep_hours)
+
+    print("=== Scenario A (basis) vs. B (dubbele belasting op opslag) ===")
+    print(f"{'':28}{'A':>12}{'B':>12}")
+    print(f"{'Netto kosten RBC':28}{rbc_financials['net_cost_eur']:>12.2f}{rbc_financials_b['net_cost_eur']:>12.2f}")
+    print(f"{'Netto kosten LP':28}{lp_financials['net_cost_eur']:>12.2f}{lp_financials_b['net_cost_eur']:>12.2f}")
+    print(
+        f"{'Cycli/jaar LP':28}{equivalent_full_cycles(lp_result, CONFIG.battery):>12.0f}"
+        f"{equivalent_full_cycles(lp_result_b, CONFIG.battery):>12.0f}"
+    )
 
 
 if __name__ == "__main__":
