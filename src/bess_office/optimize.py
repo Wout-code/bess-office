@@ -152,6 +152,10 @@ def run_lp_dispatch(
 
     model.soc_dynamics = pyo.Constraint(model.T, rule=soc_rule)
 
+    # Eind-SoC minstens begin-SoC (BAT-9): anders trekt de LP de batterij aan
+    # het eind van de horizon gratis leeg en telt die energie als winst.
+    model.terminal_soc = pyo.Constraint(expr=model.soc[len(timestamps) - 1] >= initial_soc)
+
     def balance_rule(m, t):
         # (load + charge) gedekt door (pv + discharge + import), rest export.
         return load[t] + m.charge[t] == pv[t] + m.discharge[t] + m.grid_import[t] - m.grid_export[t]
