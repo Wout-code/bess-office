@@ -13,6 +13,7 @@ de LP-optimalisatie (optimize.py), op zowel piekreductie als euro's.
 """
 
 import dataclasses
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -23,6 +24,9 @@ from bess_office.fetch_load import derive_peak_kwh_per_quarter, get_relative_pro
 from bess_office.fetch_prices import get_day_ahead_prices
 from bess_office.fetch_pv import get_pv_profile
 from bess_office.optimize import run_lp_dispatch
+from bess_office.plotting import plot_cost_breakdown
+
+RESULTS_DIR = Path(__file__).parent / "results"
 
 
 def compute_financial_metrics(
@@ -195,6 +199,23 @@ def main() -> None:
     print(f"Gekozen RBC-drempel: {rbc_threshold_kw:.0f} kW")
     print()
 
+    # --- Referentie: geen batterij. Zelfde RBC-functie met een batterij van
+    # 0 kWh / 0 kW, zodat kolommen en energiebalans gegarandeerd identiek zijn.
+    no_battery_result = run_baseline_dispatch(
+        pv_quarter,
+        load,
+        BatteryConfig(capacity_kwh=0.0, power_kw=0.0),
+        peak_threshold_kw=rbc_threshold_kw,
+        timestep_hours=CONFIG.sim.timestep_hours,
+    )
+    no_battery_metrics = compute_dispatch_metrics(
+        no_battery_result, peak_threshold_kw=rbc_threshold_kw, timestep_hours=CONFIG.sim.timestep_hours
+    )
+    no_battery_financials = compute_financial_metrics(
+        no_battery_result, prices_quarter, CONFIG.grid_tariff, CONFIG.sim.timestep_hours
+    )
+    print_dispatch_report("Geen batterij", no_battery_result, no_battery_metrics, no_battery_financials)
+
     rbc_result = run_baseline_dispatch(
         pv_quarter,
         load,
@@ -267,14 +288,42 @@ def main() -> None:
     )
     lp_financials_b = compute_financial_metrics(lp_result_b, prices_quarter, tariff_b, CONFIG.sim.timestep_hours)
 
+    # Zonder batterij is charge_kwh overal 0, dus B == A voor dit scenario.
+    no_battery_financials_b = compute_financial_metrics(
+        no_battery_result, prices_quarter, tariff_b, CONFIG.sim.timestep_hours
+    )
+
     print("=== Scenario A (basis) vs. B (dubbele belasting op opslag) ===")
-    print(f"{'':28}{'A':>12}{'B':>12}")
-    print(f"{'Netto kosten RBC':28}{rbc_financials['net_cost_eur']:>12.2f}{rbc_financials_b['net_cost_eur']:>12.2f}")
-    print(f"{'Netto kosten LP':28}{lp_financials['net_cost_eur']:>12.2f}{lp_financials_b['net_cost_eur']:>12.2f}")
+    print(f"{'':36}{'A':>12}{'B':>12}")
+    for label, fin_a, fin_b in [
+        ("Netto kosten geen batterij", no_battery_financials, no_battery_financials_b),
+        ("Netto kosten RBC", rbc_financials, rbc_financials_b),
+        ("Netto kosten LP", lp_financials, lp_financials_b),
+    ]:
+        print(f"{label:36}{fin_a['net_cost_eur']:>12.2f}{fin_b['net_cost_eur']:>12.2f}")
+    for label, fin_a, fin_b in [
+        ("Besparing RBC t.o.v. geen batterij", rbc_financials, rbc_financials_b),
+        ("Besparing LP t.o.v. geen batterij", lp_financials, lp_financials_b),
+    ]:
+        saving_a = no_battery_financials["net_cost_eur"] - fin_a["net_cost_eur"]
+        saving_b = no_battery_financials_b["net_cost_eur"] - fin_b["net_cost_eur"]
+        print(f"{label:36}{saving_a:>12.2f}{saving_b:>12.2f}")
     print(
-        f"{'Cycli/jaar LP':28}{equivalent_full_cycles(lp_result, CONFIG.battery):>12.0f}"
+        f"{'Cycli/jaar LP':36}{equivalent_full_cycles(lp_result, CONFIG.battery):>12.0f}"
         f"{equivalent_full_cycles(lp_result_b, CONFIG.battery):>12.0f}"
     )
+    print()
+
+    # --- Plot: jaarkosten per component, scenario A ---
+    plot_path = plot_cost_breakdown(
+        {
+            "Geen batterij": no_battery_financials,
+            f"RBC ({rbc_threshold_kw:.0f} kW)": rbc_financials,
+            "LP": lp_financials,
+        },
+        RESULTS_DIR / "cost_breakdown.png",
+    )
+    print(f"Plot opgeslagen: {plot_path}")
 
 
 if __name__ == "__main__":
