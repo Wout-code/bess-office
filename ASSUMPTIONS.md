@@ -146,8 +146,8 @@ rekenmodel je gebruikt.
   scenario B 264. Dat staat tegenover ≥ 6000 cycli voor de BOLT-241 (opgave,
   niet geverifieerd, zie DATA-9): zelfs bij 487/jaar ~12 jaar. Bovendien
   is de C-rate 99 kW / 241 kWh ≈ 0,41C, een mild regime waarin
-  kalenderveroudering domineert over cyclusstress (insights.md, Wang et
-  al. 2011). Een cycluskost in de objective is een mogelijke uitbreiding,
+  kalenderveroudering domineert over cyclusstress (Wang et al., 2011:
+  onder ~0,5C is cyclusdiepte niet meer de dominante schadeoorzaak). Een cycluskost in de objective is een mogelijke uitbreiding,
   niet geïmplementeerd.
 - **BAT-4** — Geen minimale aan/uit-tijd — batterij schakelt vrij
 - **BAT-5** — Efficiëntie/capaciteit constant, ongeacht SoC, laadsnelheid
@@ -238,8 +238,9 @@ van correcte fysica of betere parameters.
   van PV geladen wordt) en max SoC, met hetzelfde laadverlies als PV-laden
   (BAT-2). Bijeffect: de RBC-zelfconsumptie daalt (2023, drempel 52 kW: 83,1%
   zonder vs. 78,6% met grid-charging; zonder batterij 78,3%), omdat de
-  batterij vaker vol is als er PV-overschot komt (gedeelde SoC, zie
-  insights.md). Ook de netto kosten van de RBC zijn bij dezelfde drempel iets
+  batterij vaker vol is als er PV-overschot komt: peak shaving en
+  zelfconsumptie concurreren om dezelfde SoC, en de drempel maakt die
+  afweging impliciet. Ook de netto kosten van de RBC zijn bij dezelfde drempel iets
   hoger met grid-charging (€63.558 vs. €63.300).
 
 ## dispatch_sim.py specifiek (blijft regelgebaseerd)
@@ -271,8 +272,10 @@ van correcte fysica of betere parameters.
   laadverlies verloren; zelfs gewaardeerd tegen de laagste prijs
   (−500 EUR/MWh) is dat hooguit ~€270/jaar, ~3% van de LP-besparing.
   Scenario B: 16 kwartieren, ook allemaal bij een negatieve prijs. Bewust
-  niet opgelost met binaries (LP, geen MILP, zie insights.md); het effect is
-  financieel klein en zichtbaar gerapporteerd.
+  niet opgelost met binaries: het model blijft een LP, omdat een MILP over
+  35.040 kwartieren veel trager oplost en geen gegarandeerd globaal optimum
+  binnen praktische tijd geeft. Het effect is financieel klein en zichtbaar
+  gerapporteerd.
 - **BAT-9** — Eind-SoC ≥ begin-SoC (`initial_soc_fraction`) aan het eind
   van de horizon. Zonder deze voorwaarde trekt de LP de batterij aan het
   eind gratis leeg en telt die energie als besparing. De RBC heeft deze

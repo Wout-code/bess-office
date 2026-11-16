@@ -7,9 +7,10 @@ consumption, and actual day-ahead prices, align them to a common
 quarter-hour resolution, run BOTH dispatch methods, and translate the
 results to EUR -- runnable directly from the terminal with `uv run main.py`.
 
-This is Fase 1's deliverable (zie ROADMAP.md): een kwantitatieve
-vergelijking tussen de regelgebaseerde baseline (RBC, dispatch_sim.py) en
-de LP-optimalisatie (optimize.py), op zowel piekreductie als euro's.
+Het resultaat is een kwantitatieve vergelijking tussen geen batterij, de
+regelgebaseerde baseline (RBC, dispatch_sim.py) en de LP-optimalisatie
+(optimize.py), op zowel piekreductie als euro's, voor scenario A (basis)
+en B (dubbele energiebelasting op opslag, NET-6).
 """
 
 import dataclasses
@@ -32,17 +33,25 @@ RESULTS_DIR = Path(__file__).parent / "results"
 def compute_financial_metrics(
     result: pd.DataFrame, prices_eur_mwh: pd.Series, grid_tariff, timestep_hours: float
 ) -> dict:
-    """Translate a dispatch result (kWh) into EUR -- as a separate step
-    AFTER the dispatch itself (dispatch_sim.py and optimize.py both stay
-    kWh-only by design, see ASSUMPTIONS.md Architectuur).
+    """Translate a dispatch result (kWh) into EUR, as a separate step
+    after the dispatch itself.
 
-    Rekent dezelfde drie kostencomponenten als optimize.py's objective
-    (energie, transport, maandpiek -- zie config.py GridTariffConfig voor
-    waarom het bij twee componenten + maandpiek is gebleven, GTV
-    bewust buiten scope), zodat de baseline en de LP op een EERLIJKE,
-    identieke kostenformule vergeleken worden. Werkt voor het resultaat
-    van ZOWEL run_baseline_dispatch als run_lp_dispatch -- beide geven
-    dezelfde kolommen terug.
+    dispatch_sim.py is kWh-only by design (ARCH-1); optimize.py has its
+    costs inside the objective (ARCH-4). This function recomputes the cost
+    of BOTH results with one identical formula, so the comparison is fair.
+    It uses the same components as optimize.py's objective:
+
+    - import cost and export revenue at the day-ahead price (ARCH-5),
+    - transport tariff per kWh imported,
+    - energy tax per kWh imported, no netting (NET-5),
+    - storage tax per kWh charged into the battery (NET-6, 0 in scenario A),
+    - monthly peak tariff per kW of the highest quarter-hour import per
+      calendar month.
+
+    The annual GTV/contract-capacity component is deliberately not
+    modeled (see config.py GridTariffConfig). Works for the output of
+    run_baseline_dispatch and run_lp_dispatch alike -- both return the
+    same columns.
     """
     prices_eur_kwh = prices_eur_mwh / 1000  # ENTSO-E levert EUR/MWh
 
@@ -259,7 +268,7 @@ def main() -> None:
     )
     print_dispatch_report("LP-optimalisatie", lp_result, lp_metrics, lp_financials)
 
-    # --- Vergelijking: dit is het eigenlijke Fase 1-deliverable ---
+    # --- Vergelijking RBC vs. LP ---
     print("=== Vergelijking RBC vs. LP ===")
     cost_savings = rbc_financials["net_cost_eur"] - lp_financials["net_cost_eur"]
     cost_savings_pct = (

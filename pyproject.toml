@@ -1,7 +1,7 @@
 [project]
 name = "bess-office"
 version = "0.1.0"
-description = "Add your description here"
+description = "Transparent battery dispatch model for an SME office building: rule-based peak shaving vs. LP optimization on real PVGIS, ENTSO-E and Liander data"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

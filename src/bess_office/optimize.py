@@ -1,25 +1,32 @@
 """LP-based battery dispatch optimization, using Pyomo.
 
-Same physical battery model and input format as dispatch_sim.py (V1),
-but decides charge/discharge by solving a single linear program over
-the full horizon at once, instead of applying reactive priority rules.
+Same physical battery model and input format as dispatch_sim.py, but
+decides charge/discharge by solving a single linear program over the
+full horizon at once, instead of applying reactive priority rules.
 See ASSUMPTIONS.md (V2) for what changes vs. the rule-based baseline:
-grid-charging allowed, peak threshold optimized internally (not a fixed
-input), costs inside the objective, perfect-forecast horizon (a known
-simplification -- see ROADMAP.md Fase 3 for the MPC follow-up that
-removes it).
+grid charging is free (the solver decides), the monthly peaks are
+optimized internally instead of following a fixed threshold, costs sit
+inside the objective (ARCH-4), and the horizon is a perfect forecast
+(TIME-2) -- so the result is an upper bound on what a real controller
+could achieve.
 
-Cost has two components (energy + monthly peak), both already in EUR --
-this is a single-objective LP with a richer cost function, not
-multi-objective optimization (see ROADMAP.md Fase 2 for why that
-distinction matters).
+The objective is the total annual cost in EUR, with five components:
+- energy: (import - export) x day-ahead price,
+- transport: tariff per kWh of grid import,
+- energy tax: tariff per kWh of grid import, no netting (NET-5),
+- storage tax: tariff per kWh charged into the battery, 0 by default;
+  only non-zero in the hypothetical double-tax scenario (NET-6),
+- monthly peak: tariff per kW of the highest quarter-hour import in
+  each calendar month.
+All components are already in EUR, so this is a single-objective LP
+with a richer cost function, not a multi-objective optimization.
 
 Requires a solver Pyomo can call, e.g. CBC (`conda install -c
 conda-forge coincbc`, or download a CBC binary) or HiGHS (`pip install
 highspy`, then SolverFactory("appsi_highs")). This file defaults to CBC.
 """
 
-# Open, nog niet opgelost in dit bestand (zie ASSUMPTIONS.md / z.TODO.md):
+# Open, nog niet opgelost in dit bestand (zie ASSUMPTIONS.md):
 # - BAT-7: asymmetrisch laad-/ontlaadvermogen nog niet verwerkt, power_kw
 #   wordt nog voor beide richtingen gebruikt.
 # - BAT-3: geen degradatiekost -- de solver ziet cyclen als gratis. Dit is
@@ -30,22 +37,6 @@ highspy`, then SolverFactory("appsi_highs")). This file defaults to CBC.
 # - GTV/jaarlijkse-overschrijding-component (zie config.py GridTariffConfig)
 #   wordt NIET gemodelleerd -- bewuste vereenvoudiging, zie daar voor
 #   details en de TODO om dit later toe te voegen.
-#
-# Dit gesprek gefixt, samengevat (zie het statusoverzicht-document voor de
-# volledige geschiedenis van deze paar stappen):
-# - transport_tariff_eur_per_kwh ontbrak volledig uit energy_cost -- nu
-#   toegevoegd, alleen op import (export betaalt geen transporttarief,
-#   zie ASSUMPTIONS.md ARCH-5).
-# - Piekkost gebruikte eerst het verkeerde tariefveld, en later een
-#   aanname over een jaarlijks GTV/overschrijdingsmechanisme die bij
-#   verificatie tegen Liander's eigen tarievendocument onvolledig bleek:
-#   er bestaat namelijk een APARTE, maandelijkse piekcomponent ("kW max.
-#   mnd" in Liander's tabel) naast de jaarlijkse GTV-component. Dit
-#   bestand modelleert nu alleen die maandelijkse component (bewuste
-#   vereenvoudiging, zie config.py) -- peak_import_kw is dus weer per
-#   kalendermaand, net als de eerdere versie, maar nu met een eerlijk
-#   benoemd tariefveld (monthly_peak_tariff_eur_per_kw) in plaats van een
-#   verkeerd begrepen "overshoot penalty" of "GTV-tarief."
 
 import pandas as pd
 import pyomo.environ as pyo
@@ -63,7 +54,8 @@ def run_lp_dispatch(
 ) -> pd.DataFrame:
     """
     Solve a single linear program for battery dispatch over the full
-    horizon, minimizing total cost (energy + transport + monthly peak).
+    horizon, minimizing total cost (energy + transport + energy tax +
+    storage tax + monthly peak).
 
     Parameters
     ----------
@@ -76,7 +68,7 @@ def run_lp_dispatch(
     prices_eur_mwh : pd.Series
         Day-ahead prices, same index as pv_kwh/load_kwh.
     battery : BatteryConfig
-        Same battery model as V1. Note: asymmetric charge/discharge
+        Same battery model as dispatch_sim.py. Note: asymmetric charge/discharge
         power (BAT-7, see ASSUMPTIONS.md) is not yet split into separate
         limits here -- power_kw is still used for both directions.
     grid_tariff : GridTariffConfig
@@ -90,7 +82,8 @@ def run_lp_dispatch(
           import in a calendar month, charged separately per month
           (Liander's "kW max. mnd" component). The GTV/annual-contract
           component is NOT modeled here.
-        Both must be set (not None).
+        transport_tariff_eur_per_kwh and monthly_peak_tariff_eur_per_kw
+        must be set (not None).
     timestep_hours : float
         Length of each timestep, e.g. 0.25 for quarter-hour data.
 

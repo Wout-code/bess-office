@@ -1,18 +1,19 @@
 """Rule-based (heuristic) battery dispatch simulation.
 
 This is a deterministic, non-optimizing baseline: a simple set of
-priority rules decides charge/discharge behaviour each hour. It exists
+priority rules decides charge/discharge behaviour each timestep. It exists
 to give a reference point to compare the LP optimization (optimize.py)
 against -- "how much better does actual optimization do than a
 sensible but non-optimal rule-based controller?"
 
-Two value drivers are combined, matching what an office building
-(MKB) battery is actually used for:
-1. Self-consumption: charge on PV surplus, discharge on PV deficit.
-2. Peak shaving: discharge (even beyond self-consumption) whenever
-   grid import would otherwise exceed a configured peak threshold,
-   since MKB capacity tariffs are billed on the highest measured
-   quarter-hour peak in a billing period.
+Three rules, applied each timestep:
+1. PV charging: charge with PV surplus, limited by power rating and
+   remaining capacity.
+2. Peak shaving: discharge only when grid import would otherwise exceed
+   the peak threshold, and only down to that threshold (MKB capacity
+   tariffs are billed on the highest quarter-hour peak per month).
+   Below the threshold the battery does NOT discharge, so a PV deficit
+   on its own is covered from the grid, not from the battery.
 3. Grid charging (ARCH-3): whenever grid import stays below the peak
    threshold, top the battery up from the grid with at most the
    remaining headroom to the threshold, so it is full before the next
@@ -192,8 +193,9 @@ def compute_dispatch_metrics(
 if __name__ == "__main__":
     # Isolated logic test with synthetic, perfectly-aligned data.
     # This checks the dispatch RULES, not real-world data integration
-    # (timezones, resampling, index alignment) -- that's covered in
-    # notebooks/1.0-dispatch-baseline-test.ipynb.
+    # (timezones, resampling, index alignment) -- that happens in main.py.
+    # Uurdata (timestep 1.0): kWh == kW, dus eenheidsfouten zijn hier niet
+    # zichtbaar -- daarvoor zijn de pytest-tests met timestep 0.25.
     import numpy as np
 
     hours = pd.date_range("2023-06-01", periods=24, freq="1h")
