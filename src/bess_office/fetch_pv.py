@@ -28,9 +28,13 @@ def get_pv_profile(pv_config: PVConfig | None = None) -> pd.Series:
         pv_config = CONFIG.pv
 
     raw_dir = CONFIG.data_dir / "raw"
-    raw_path = (
-        raw_dir
-        / f"pvgis_{pv_config.latitude}_{pv_config.longitude}_{pv_config.year}.csv"
+    # Alle parameters die de PVGIS-respons bepalen horen in de bestandsnaam.
+    # Anders wordt na een configwijziging (bv. peak_power_kw) stilzwijgend
+    # een oude cache geladen die niet meer bij de config past.
+    raw_path = raw_dir / (
+        f"pvgis_{pv_config.latitude}_{pv_config.longitude}_{pv_config.year}"
+        f"_{pv_config.peak_power_kw}kWp_tilt{pv_config.tilt}_az{pv_config.azimuth}"
+        f"_loss{pv_config.system_loss_pct}_{pv_config.mounting_place}.csv"
     )
 
     if raw_path.exists():
