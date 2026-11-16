@@ -74,7 +74,11 @@ class SimConfig:
 @dataclass
 class DispatchConfig:
     """Rule-based dispatch (dispatch_sim.py) specific settings."""
-    peak_threshold_kw: float = 99.4
+    # De RBC-drempel wordt niet meer vast gekozen, maar in main.py gescand op
+    # laagste jaarlijkse netto kosten (NET-4): range(min, max + 1, step).
+    threshold_scan_min_kw: float = 50.0
+    threshold_scan_max_kw: float = 99.0
+    threshold_scan_step_kw: float = 2.0
 
 
 @dataclass

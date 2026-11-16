@@ -12,9 +12,10 @@ vergelijking tussen de regelgebaseerde baseline (RBC, dispatch_sim.py) en
 de LP-optimalisatie (optimize.py), op zowel piekreductie als euro's.
 """
 
+import numpy as np
 import pandas as pd
 
-from bess_office.config import CONFIG
+from bess_office.config import CONFIG, BatteryConfig
 from bess_office.dispatch_sim import compute_dispatch_metrics, run_baseline_dispatch
 from bess_office.fetch_load import derive_peak_kwh_per_quarter, get_relative_profile
 from bess_office.fetch_prices import get_day_ahead_prices
@@ -57,6 +58,36 @@ def compute_financial_metrics(
         "net_cost_eur": import_cost + transport_cost + peak_cost - export_revenue,
         "monthly_peak_kw": monthly_peak_kw,
     }
+
+
+def select_rbc_threshold(
+    pv_kwh: pd.Series,
+    load_kwh: pd.Series,
+    prices_eur_mwh: pd.Series,
+    battery: BatteryConfig,
+    grid_tariff,
+    timestep_hours: float,
+) -> tuple[float, pd.Series]:
+    """Scan RBC peak thresholds and return the one with the lowest annual
+    net cost, plus the net cost per scanned threshold (NET-4).
+
+    De prijzen blijven zo buiten dispatch_sim.py (ARCH-1): de regel zelf is
+    prijsloos, alleen de keuze van de drempel gebeurt hier, achteraf op het
+    hele jaar (in-sample, dus gunstig voor de RBC).
+    """
+    cfg = CONFIG.dispatch
+    thresholds_kw = np.arange(
+        cfg.threshold_scan_min_kw, cfg.threshold_scan_max_kw + 1e-9, cfg.threshold_scan_step_kw
+    )
+    net_cost_eur = {}
+    for threshold_kw in thresholds_kw:
+        result = run_baseline_dispatch(
+            pv_kwh, load_kwh, battery, peak_threshold_kw=float(threshold_kw), timestep_hours=timestep_hours
+        )
+        financials = compute_financial_metrics(result, prices_eur_mwh, grid_tariff, timestep_hours)
+        net_cost_eur[float(threshold_kw)] = financials["net_cost_eur"]
+    scan = pd.Series(net_cost_eur, name="net_cost_eur")
+    return float(scan.idxmin()), scan
 
 
 def print_dispatch_report(label: str, result: pd.DataFrame, metrics: dict, financials: dict) -> None:
@@ -136,16 +167,27 @@ def main() -> None:
     print()
 
     # --- RBC (Rule-Based Control): regelgebaseerde baseline, dispatch_sim.py ---
+    # Drempel eerlijk kiezen: scan op laagste jaarlijkse netto kosten (NET-4).
+    rbc_threshold_kw, threshold_scan = select_rbc_threshold(
+        pv_quarter, load, prices_quarter, CONFIG.battery, CONFIG.grid_tariff, CONFIG.sim.timestep_hours
+    )
+    print(
+        f"RBC-drempelscan {threshold_scan.index.min():.0f}-{threshold_scan.index.max():.0f} kW: "
+        f"netto kosten €{threshold_scan.min():.2f} - €{threshold_scan.max():.2f}"
+    )
+    print(f"Gekozen RBC-drempel: {rbc_threshold_kw:.0f} kW")
+    print()
+
     rbc_result = run_baseline_dispatch(
         pv_quarter,
         load,
         CONFIG.battery,
-        peak_threshold_kw=CONFIG.dispatch.peak_threshold_kw,
+        peak_threshold_kw=rbc_threshold_kw,
         timestep_hours=CONFIG.sim.timestep_hours,
     )
     rbc_metrics = compute_dispatch_metrics(
         rbc_result,
-        peak_threshold_kw=CONFIG.dispatch.peak_threshold_kw,
+        peak_threshold_kw=rbc_threshold_kw,
         timestep_hours=CONFIG.sim.timestep_hours,
     )
     rbc_financials = compute_financial_metrics(
@@ -171,7 +213,7 @@ def main() -> None:
     # niet iets waar de LP zelf tegen optimaliseert.
     lp_metrics = compute_dispatch_metrics(
         lp_result,
-        peak_threshold_kw=CONFIG.dispatch.peak_threshold_kw,
+        peak_threshold_kw=rbc_threshold_kw,
         timestep_hours=CONFIG.sim.timestep_hours,
     )
     lp_financials = compute_financial_metrics(
