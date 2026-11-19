@@ -86,7 +86,7 @@ PVGIS and ENTSO-E data are fetched and cached on the first run.
 
 The key open question: how much of the €8,264 remains without perfect knowledge of the future?
 
-- **Rolling-horizon MPC:** optimize daily over 24–48 hours using forecasts.
+- **Rolling-horizon optimization:** optimize daily over 24–48 hours using forecasts.
 - **Sensitivity to noise:** savings under increasing errors in price, PV and consumption forecasts.
 - **Degradation cost:** a cost per kWh of throughput in the objective, to see how many cycles
   and how much of the savings remain once wear is priced in.
