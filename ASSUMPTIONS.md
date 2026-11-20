@@ -34,12 +34,16 @@ check the matching comment in the code.
   constant within each hour.
 
 **DATA-5 — PV data (PVGIS)**
-- PVGIS has hourly resolution, so short cloud transients within the hour are not represented.
+- Hourly resolution: short cloud transients within the hour are not represented.
   Together with the smoothed load profile (DATA-7), the model sees fewer and
   milder short-term net-load peaks than a real building.
 - PVGIS's default shading model uses an elevation map: it sees hills, but not
   buildings. Shading from taller neighbouring buildings is not included, so PV
   yield may be overestimated.
+- Mounting is modeled as free-standing. PVGIS only offers free-standing or
+  building-integrated; panels on a low frame on a flat roof are in between,
+  with less airflow than free-standing, so PV yield may be slightly
+  overestimated.
 
 **DATA-6 — Load data (Liander K&O profile)**
 - Liander's own standard profile for offices, built from telemetry of large
