@@ -14,6 +14,9 @@ The inputs are real data: PVGIS (PV), ENTSO-E (day-ahead prices NL) and the Lian
 for offices (consumption). Every assumption has an ID in [`ASSUMPTIONS.md`](ASSUMPTIONS.md).
 
 ## Reference case
+A hypothetical office building, not a real site: consumption comes from a standard profile scaled to
+a typical Dutch office (DATA-8), PV is simulated for Delft. The battery is a commercially available
+product, the Boltainer BOLT-241; its efficiency and SoC limits are typical LFP values (DATA-9).
 
 | Component | Value |
 |---|---|
