@@ -53,69 +53,44 @@ class SimConfig:
 @dataclass
 class DispatchConfig:
     """Rule-based dispatch (dispatch_sim.py) specific settings."""
-    # The RBC threshold is no longer fixed, but scanned in main.py for the
-    # lowest annual net cost (NET-4): range(min, max + 1, step).
+    # The RBC uses one fixed threshold for the whole year. It is not set by
+    # hand: main.py scans min..max (inclusive) in steps of step_kw and picks
+    # the threshold with the lowest annual net cost (NET-4).
     threshold_scan_min_kw: float = 50.0
-    threshold_scan_max_kw: float = 99.0
+    threshold_scan_max_kw: float = 98.0
     threshold_scan_step_kw: float = 2.0
 
 
 @dataclass
 class GridTariffConfig:
     """
-    Grid operator transport costs -- DELIBERATELY SIMPLIFIED, see below.
+    Grid tariffs for Liander sub-market MS/LS > 50 up to and including 136 kW
+    (applies to the ~99.4 kW peak), 2026 tariff sheet:
+    https://www.liander.nl/-/media/files/tarieven/grootzakelijk/tarieven-2026/tarieven-voor-aansluiting-en-transport-elektriciteit-2026_2.pdf
 
-    The tariff STRUCTURE comes from the Liander PDF "tarieven voor aansluiting
-    en transport elektriciteit 2026" (sub-market MS/LS > 50 up to and including
-    136 kW, applicable to ~99.4 kW); the NUMBERS below have not been verified
-    (see TODO). According to that PDF there are TWO separate capacity components:
-      1. "kW contract" -- annual tariff for contracted transport capacity (GTV)
-         over your contracted power; exceeding it automatically raises your GTV
-         for the entire calendar year (no separate penalty tariff).
-      2. "kW max. mnd" -- a SEPARATE tariff, recalculated every month over
-         the highest measured peak that month, independent of your GTV.
+    Liander charges two capacity components: an annual tariff on the
+    contracted capacity (GTV, "kW contract") and a monthly tariff on the
+    highest measured peak ("kW max. mnd"). Only the monthly peak is modeled;
+    the GTV is treated as a fixed cost (NET-8).
 
-    SIMPLIFICATION (deliberate, to get the model working now): this
-    file models only component 2 (the monthly peak). Component
-    1 (GTV/annual exceedance) is NOT included -- treated as
-    a fixed, dispatch-independent cost, out of scope for now.
-    optimize.py therefore only minimizes the sum of the 12 monthly peaks × the
-    monthly tariff, not the full Liander cost structure.
-
-    TODO, in order:
-    - The numbers below are ESTIMATES from an AI summary of
-      the Liander PDF, NOT manually verified -- two attempts gave
-      mutually inconsistent figures for the same sub-market. Check
-      the exact table yourself in:
-      https://www.liander.nl/-/media/files/tarieven/grootzakelijk/tarieven-2026/tarieven-voor-aansluiting-en-transport-elektriciteit-2026_2.pdf
-    - Once verified: add component 1 (GTV) to the model after all,
-      e.g. as a peak_floor constraint on an annual peak.
+    Transport and capacity figures are not yet verified against the tariff
+    sheet (NET-8).
     """
-    # Component: transport tariff over the total annual volume, kWh -- no
-    # relation to the peak. ESTIMATE, not verified: €0.0226/kWh (sub-market
-    # MS/LS > 50 up to and including 136 kW).
+    # EUR per kWh imported, independent of the peak.
     transport_tariff_eur_per_kwh: float | None = 0.0226
 
-    # Component: "kW max. mnd" -- tariff per kW of the highest measured
-    # peak in a calendar month. This is the only capacity tariff that
-    # optimize.py currently uses. ESTIMATE, not verified:
-    # €3.57/kW/month (sub-market MS/LS > 50 up to and including 136 kW).
+    # EUR per kW of the highest quarter-hour import, per calendar month.
     monthly_peak_tariff_eur_per_kw: float | None = 3.57
 
-    # Energy tax (energiebelasting, NET-5): fixed rate per imported kWh, marginal
-    # bracket 50,000-10 million kWh, 2026, excl. VAT. Only on import, no
-    # net metering (saldering) for large consumers. The higher rates of the first
-    # 50,000 kWh are a fixed cost and not decision-relevant.
+    # Energy tax, marginal bracket 50,000-10 million kWh, 2026, excl. VAT;
+    # import only, no net metering for large consumers (NET-5).
     energy_tax_eur_per_kwh: float = 0.03735
 
-    # Hypothetical double energy tax on storage (NET-6), per kWh that goes into
-    # the battery (charge_kwh, so PV charging too: upper bound).
-    # 0.0 = scenario A (base); equal to energy_tax_eur_per_kwh = scenario B.
+    # Extra tax per kWh charged into the battery: 0.0 = scenario A,
+    # equal to energy_tax_eur_per_kwh = scenario B (NET-6).
     storage_charge_tax_eur_per_kwh: float = 0.0
 
-    # Not used in the current simplified model -- kept for when
-    # component 1 (GTV/annual exceedance) is added.
-    # ESTIMATE, not verified: €3.74/kW/month for the GTV tariff.
+    # GTV component, not used yet (NET-8): EUR per kW contracted, per month.
     contracted_capacity_kw: float | None = None
     contracted_capacity_tariff_eur_per_kw: float | None = 3.74
 
