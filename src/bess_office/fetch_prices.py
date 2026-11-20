@@ -17,42 +17,49 @@ def get_day_ahead_prices(
     save_raw: bool = True,
 ) -> pd.Series:
     """
-    Fetch day-ahead electricity prices for a given period and country.
+    Fetch day-ahead electricity prices for a given period and bidding zone.
+
+    Loads from the CSV in data/raw/ if available; the 2023 prices for NL are
+    included in the repository, so the reference case runs without an API key.
+    For other periods or zones it queries ENTSO-E, which requires the
+    ENTSOE_API_KEY environment variable (see the README for how to get a key),
+    and caches the result.
 
     Parameters
     ----------
     start : pd.Timestamp
-        Start of the period (timezone-aware, e.g. "Europe/Amsterdam").
+        Start of the period (tz-aware, e.g. "Europe/Amsterdam").
     end : pd.Timestamp
-        End of the period (timezone-aware).
+        End of the period (tz-aware).
     country_code : str
         ENTSO-E bidding zone code, "NL" for the Netherlands.
     save_raw : bool
-        If True, saves the unmodified API response to data/raw/.
+        If True, caches the fetched prices to data/raw/ as CSV.
 
     Returns
     -------
     pd.Series
         Day-ahead prices in EUR/MWh, indexed by timestamp (tz-aware,
-        local time -- matches fetch_load.py and fetch_pv.py's
-        convention, so all three series can be combined directly).
-        Resolution depends on the queried period: hourly before the
-        SDAC 15-minute MTU transition (1 October 2025), 15-minute
-        (quarter-hour) after.
+        Europe/Amsterdam, like fetch_load.py and fetch_pv.py). Resolution is
+        hourly before the SDAC 15-minute transition (1 October 2025) and
+        quarter-hourly after.
     """
     raw_path = RAW_DATA_DIR / f"entsoe_prices_{country_code}_{start.date()}_{end.date()}.csv"
 
     if raw_path.exists():
-        print(f"Already available locally, loading from disk: {raw_path}")
+        print(f"Loading prices from disk: {raw_path}")
         df = pd.read_csv(raw_path, index_col=0)
-        df.index = pd.to_datetime(df.index, utc=True).tz_convert("Europe/Amsterdam")
+        # The CSV stores timestamps with their UTC offset; parse via UTC so the
+        # clock changes are handled correctly.
+        df.index = pd.to_datetime(df.index, utc=True)
         prices = df["price_eur_mwh"]
     else:
         api_key = os.getenv("ENTSOE_API_KEY")
         if not api_key:
             raise RuntimeError(
-                "ENTSOE_API_KEY not found. Set it as an environment variable "
-                "(see README for instructions)."
+                f"No cached prices at {raw_path} and ENTSOE_API_KEY not found. "
+                "Set it as an environment variable to fetch this period "
+                "(see README for how to get a key)."
             )
 
         client = EntsoePandasClient(api_key=api_key)
@@ -61,12 +68,10 @@ def get_day_ahead_prices(
         if save_raw:
             RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
             prices.to_csv(raw_path, header=["price_eur_mwh"])
-            print(f"Saved raw prices to {raw_path}")
+            print(f"Saved prices to {raw_path}")
 
-    # Same convention as fetch_load.py/fetch_pv.py: tz-aware,
-    # Europe/Amsterdam. ENTSO-E already supplies it this way on a fresh fetch;
-    # this line guarantees that the cache route (after a CSV round trip)
-    # gives the same result, also around the clock change.
+    # Both routes (cache and fresh fetch) end up tz-aware in Europe/Amsterdam,
+    # like fetch_load.py and fetch_pv.py (DATA-1).
     prices.index = prices.index.tz_convert("Europe/Amsterdam")
 
     return prices
