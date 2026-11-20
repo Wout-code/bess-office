@@ -221,7 +221,8 @@ Both models are costed with the same formula (`compute_financial_metrics` in
 ## LP optimization (`optimize.py`)
 
 - **TIME-2** — Perfect foresight over the full year: the LP result is an upper
-  bound on what a real controller could achieve.
+  bound on what any controller could achieve within this model (same data,
+  tariffs and value streams), not on what a battery could earn in reality.
 - **ARCH-4** — Costs sit directly in the objective; there is no separate
   financial layer.
 - **BAT-8** — Simultaneous charging and discharging is not excluded. Excluding

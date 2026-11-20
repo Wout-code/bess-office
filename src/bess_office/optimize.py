@@ -7,8 +7,8 @@ Differences from the rule-based model (see ASSUMPTIONS.md): grid charging
 is free, the solver decides (ARCH-3); the monthly peaks are optimized
 per month instead of following one fixed threshold (NET-4); costs sit
 inside the objective (ARCH-4); and the horizon is a perfect forecast
-(TIME-2), so the result is an upper bound on what a real controller
-could achieve.
+(TIME-2), so the result is an upper bound on what any controller could
+achieve within this model (same data, tariffs and value streams).
 
 The objective is the total annual cost in EUR, with five components:
 - energy: (import - export) x day-ahead price (NET-7),
