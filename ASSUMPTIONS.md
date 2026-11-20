@@ -1,19 +1,20 @@
 # Assumptions — bess-office
-The file has two model versions: V1 is the rule-based model
-(`dispatch_sim.py`) only; V2 adds the LP optimization (`optimize.py`) and
-corrects some V1 assumptions. The data assumptions apply to both.
+The file is organized by model version. V1 was the first version: the
+rule-based model (`dispatch_sim.py`) only. V2 is the current model: the
+rule-based model with improvements, plus the LP optimization (`optimize.py`).
+The V2 sections list only what changed; every V1 assumption that is not
+corrected still applies. The data assumptions apply to both.
 
 ID scheme: every assumption has a unique ID per category: `DATA-n` (input data),
 `BAT-n` (battery), `TIME-n` (time/foresight), `NET-n` (market and grid) and
 `ARCH-n` (model architecture). Numbers are never reused: a new assumption gets
 the next free number in its category. When an assumption is corrected, the
-correction gets a new ID that refers back to the old one (e.g. BAT-7
-"corrects BAT-1").
+correction gets a new ID that refers back to the old one (e.g. ARCH-3
+"corrects ARCH-2").
 
 Replaced data assumptions are removed from this file, so gaps in the numbering
-(such as DATA-3 and DATA-4) are expected. V1 assumptions that V2 corrects stay
-listed, marked as corrected, because V1 still describes the rule-based model.
-This file shows only what currently applies.
+(such as DATA-3 and DATA-4) are expected. Corrected V1 assumptions stay listed,
+marked as corrected, so the change from V1 to V2 stays visible.
 
 Code comments refer to these IDs, so when you change an assumption here, also
 check the matching comment in the code.
