@@ -14,8 +14,7 @@ Verified file structure:
 NOTE on what this profile actually is (see ASSUMPTIONS.md DATA-6): this is one
 of Liander's own "K&O" standard profiles, built from real large-consumer
 (grootverbruik) telemetry and used by Liander itself to size new large-consumer
-connections without their own history yet. It is NOT a NEDU/EDSN small-consumer
-(kleinverbruik) allocation profile (E1A-E4A). It is a normalized shape: the
+connections without their own history yet. It is a normalized shape: the
 absolute level comes from the scale you multiply it by (see
 derive_peak_kwh_per_quarter below). That scale is chosen so the modeled
 building is also a large consumer, matching the population the profile was
