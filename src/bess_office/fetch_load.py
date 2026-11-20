@@ -7,7 +7,7 @@ and place the file in data/raw/ before running this.
 
 Verified file structure:
 - Separator: semicolon (;), decimal: period
-- Two columns: DATUM_TIJDSTIP (real datetime), WAARDE (single relative value)
+- Two columns: DATUM_TIJDSTIP (timestamp), WAARDE (relative value)
 - 35,040 rows = 365 days x 96 quarter-hours (complete year, no gaps)
 - WAARDE is relative/normalized, observed range ~0.31-0.90 (not absolute kWh)
 
@@ -32,20 +32,17 @@ LOAD_PROFILE_FILE = RAW_DATA_DIR / "KO_KANTOOR_ONDERWIJS_clean_2023_semicolon.cs
 
 def get_relative_profile() -> pd.Series:
     """
-    Load the raw, normalized K&O consumption profile shape (0-1 range),
-    not yet scaled to any specific building's peak.
+    Load the normalized K&O consumption profile shape (0-1 range), not yet
+    scaled to any specific building.
 
-    This is the "shape" half of the profile -- see derive_peak_kwh_per_quarter
-    for the "scale" half. Split out so the profile shape can be reused for
-    both scaling a load (get_load_profile) and for deriving
-    peak_kwh_per_quarter from a target annual consumption (main.py).
+    This is the "shape" half of the profile; derive_peak_kwh_per_quarter
+    gives the "scale" half.
 
     Returns
     -------
     pd.Series
         Quarter-hourly relative consumption (0-1), indexed by timestamp
-        (tz-aware, Europe/Amsterdam -- matches fetch_pv.py and
-        fetch_prices.py's convention).
+        (tz-aware, Europe/Amsterdam, like fetch_pv.py and fetch_prices.py).
     """
     if not LOAD_PROFILE_FILE.exists():
         raise FileNotFoundError(
@@ -58,60 +55,50 @@ def get_relative_profile() -> pd.Series:
     df["DATUM_TIJDSTIP"] = pd.to_datetime(df["DATUM_TIJDSTIP"])
     df = df.set_index("DATUM_TIJDSTIP")
 
-    # Normalized profile (365x96, no gaps -- see docstring), so
-    # no real clock-change irregularity in the source data. tz_localize
-    # still trips over it: nonexistent (March) we shift forward,
-    # ambiguous (October) we deliberately pick as summer time -- pragmatically
-    # correct for a normalized pattern, not for a real measurement.
+    # The profile has 96 quarter-hours every day, also on clock-change days,
+    # so it has no real DST irregularity (DATA-6). The missing hour in March
+    # is shifted forward; the double hour in October is assigned to summer
+    # time. Pragmatic for a normalized pattern, not for a real measurement.
     df.index = df.index.tz_localize(
         "Europe/Amsterdam", nonexistent="shift_forward", ambiguous=True
     )
-    # shift_forward (March) can collide with already existing rows in this
-    # uniform 96-per-day profile -- for synthetic data there is no
-    # "correct" one of the two, so deduplicate explicitly instead of guessing
+    # Shifting forward in March creates duplicate timestamps; for a synthetic
+    # profile neither one is "correct", so keep the first.
     df = df[~df.index.duplicated(keep="first")]
 
-    # Re-normalize to the profile's own max, so peak_kwh_per_quarter is
-    # reached exactly at the profile's peak moment (observed max was
-    # 0.9, not a clean 1.0).
-    relative_profile = df["WAARDE"] / df["WAARDE"].max()
-
-    return relative_profile
+    # Re-normalize to the profile's own max (observed 0.9, not 1.0), so the
+    # scaled peak is reached exactly at the profile's peak moment.
+    return df["WAARDE"] / df["WAARDE"].max()
 
 
 def derive_peak_kwh_per_quarter(
     area_m2: float, annual_kwh_per_m2: float, relative_profile: pd.Series
 ) -> float:
     """
-    Derive peak_kwh_per_quarter from a building's target annual
-    consumption and this specific profile's shape (how peaky vs. flat
-    it is).
+    Derive peak_kwh_per_quarter from a building's target annual consumption
+    and this profile's shape.
 
-    peak_kwh_per_quarter is NOT a pure building property -- it depends
-    on both the building's annual consumption (area_m2 x
-    annual_kwh_per_m2, externally verifiable against benchmarks) AND
-    the shape of whichever profile you scale it with (a flatter profile
-    needs a higher peak_kwh_per_quarter to reach the same annual total
-    than a peakier one does). Keeping the derivation here, next to the
-    profile, keeps that dependency visible instead of hiding it inside
-    a building-only config.
+    peak_kwh_per_quarter is not a pure building property: it depends on the
+    annual consumption (area_m2 x annual_kwh_per_m2, checkable against
+    benchmarks) and on the shape of the profile. A peakier profile needs a
+    higher peak_kwh_per_quarter to reach the same annual total than a flatter
+    one. Keeping the derivation next to the profile keeps that dependency
+    visible.
 
     Parameters
     ----------
     area_m2 : float
         Building floor area in square metres.
     annual_kwh_per_m2 : float
-        Target annual consumption intensity, kWh per m2 per year.
+        Annual consumption intensity, kWh per m2 per year.
     relative_profile : pd.Series
-        The 0-1 profile shape, e.g. from get_relative_profile(). Its sum
-        over the year is the conversion factor between an annual total
-        and a single peak quarter-hour.
+        The 0-1 profile shape from get_relative_profile(). Its sum over the
+        year converts an annual total into the peak quarter-hour.
 
     Returns
     -------
     float
-        peak_kwh_per_quarter: expected consumption in kWh within the
-        single most-loaded 15-minute interval of the year.
+        Consumption in kWh in the busiest quarter-hour of the year.
     """
     annual_total_kwh = area_m2 * annual_kwh_per_m2
     return annual_total_kwh / relative_profile.sum()
@@ -119,47 +106,42 @@ def derive_peak_kwh_per_quarter(
 
 def get_load_profile(peak_kwh_per_quarter: float) -> pd.Series:
     """
-    Load and scale the office (K&O Kantoor/Onderwijs) consumption profile
-    directly to a known peak_kwh_per_quarter.
+    Load the profile and scale it directly to a known peak_kwh_per_quarter.
 
     Convenience wrapper around get_relative_profile() for callers that
-    already have a peak_kwh_per_quarter value in hand (e.g.
-    dispatch_sim.py's own __main__ block) and don't need the
-    area_m2/annual_kwh_per_m2 derivation. For the real pipeline
-    (main.py), prefer get_relative_profile() + derive_peak_kwh_per_quarter()
-    so the area_m2/annual_kwh_per_m2 -> peak_kwh_per_quarter link stays
-    visible.
+    already have a peak_kwh_per_quarter value. The real pipeline (main.py)
+    uses get_relative_profile() + derive_peak_kwh_per_quarter() instead, so
+    the link from area and intensity to the peak stays visible.
 
     Parameters
     ----------
     peak_kwh_per_quarter : float
-        Expected peak consumption in kWh within a single 15-minute
-        interval for the office building being modelled. The profile
-        is re-normalized to its own max (=1.0) before scaling, so this
-        value always corresponds to the profile's actual peak moment.
+        Consumption in kWh in the busiest quarter-hour of the year.
 
     Returns
     -------
     pd.Series
-        Quarter-hourly electricity consumption in kWh, indexed by
-        timestamp (tz-aware, Europe/Amsterdam -- matches fetch_pv.py
-        and fetch_prices.py's convention).
+        Quarter-hourly consumption in kWh, indexed by timestamp (tz-aware,
+        Europe/Amsterdam).
     """
     return get_relative_profile() * peak_kwh_per_quarter
 
 
 if __name__ == "__main__":
-    load = get_load_profile(peak_kwh_per_quarter=15)
-    print(load.head())
-    print(f"\nTotal rows: {len(load)}")
-    print(f"Total annual consumption: {load.sum():.0f} kWh")
-    print(f"Peak quarter: {load.max():.2f} kWh")
+    # Sanity check against ASSUMPTIONS.md DATA-8: should give a profile sum of
+    # 20,824.42, a peak of 24.85 kWh per quarter-hour and 99.4 kW.
+    from bess_office.config import CONFIG
 
-    # Sanity check for derive_peak_kwh_per_quarter: round-tripping a
-    # chosen area/intensity should reproduce a consistent annual total.
     relative_profile = get_relative_profile()
-    print(f"\nsum(relative_profile) = {relative_profile.sum():.2f}")
-    derived_peak = derive_peak_kwh_per_quarter(
-        area_m2=590.0, annual_kwh_per_m2=115.0, relative_profile=relative_profile
+    print(relative_profile.head())
+    print(f"\nTotal rows: {len(relative_profile)}")
+    print(f"sum(relative_profile) = {relative_profile.sum():.2f}")
+
+    peak = derive_peak_kwh_per_quarter(
+        area_m2=CONFIG.building.area_m2,
+        annual_kwh_per_m2=CONFIG.building.annual_kwh_per_m2,
+        relative_profile=relative_profile,
     )
-    print(f"derive_peak_kwh_per_quarter(590 m2, 115 kWh/m2/year) = {derived_peak:.2f} kWh/quarter-hour")
+    load = relative_profile * peak
+    print(f"peak_kwh_per_quarter = {peak:.2f} kWh ({peak / 0.25:.1f} kW)")
+    print(f"Annual consumption: {load.sum():.0f} kWh")
