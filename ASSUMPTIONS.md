@@ -1,31 +1,33 @@
 # Assumptions — bess-office
-The file is organized by model version. V1 was the first version: the
-rule-based model (`dispatch_sim.py`) only. V2 is the current model: the
-rule-based model with improvements, plus the LP optimization (`optimize.py`).
-The V2 sections list only what changed; every V1 assumption that is not
-corrected still applies. The data assumptions apply to both.
+
+This file lists every modeling assumption of the two dispatch models: the
+rule-based model (RBC, `dispatch_sim.py`) and the LP optimization
+(`optimize.py`). It is organized by topic; each section says which model it
+applies to.
 
 ID scheme: every assumption has a unique ID per category: `DATA-n` (input data),
 `BAT-n` (battery), `TIME-n` (time/foresight), `NET-n` (market and grid) and
 `ARCH-n` (model architecture). Numbers are never reused: a new assumption gets
 the next free number in its category. When an assumption is corrected, the
-correction gets a new ID that refers back to the old one (e.g. ARCH-3
-"corrects ARCH-2").
+correction gets a new ID that refers back to the old one.
 
-Replaced data assumptions are removed from this file, so gaps in the numbering
-(such as DATA-3 and DATA-4) are expected. Corrected V1 assumptions stay listed,
-marked as corrected, so the change from V1 to V2 stays visible.
+This file shows only what currently applies. Replaced assumptions are removed,
+so gaps in the numbering (such as DATA-3, DATA-4, NET-1, ARCH-2 and BAT-7) are
+expected.
 
 Code comments refer to these IDs, so when you change an assumption here, also
 check the matching comment in the code.
 
-## Data & reference case (applies to both V1 and V2 — concerns the input, not the calculation)
+---
+
+## Data & reference case
 
 **DATA-1 — Time zone**
 - All data (load, PV, prices) is converted to Europe/Amsterdam, not UTC: the
   Liander profile is in local time, and the monthly peak is billed per calendar
-  month in local time. The cost is that clock changes must be handled per source
-  (DATA-5, DATA-6).
+  month in local time. Clock changes are handled per source: PV is rounded to
+  the hour in UTC before conversion, prices arrive tz-aware from ENTSO-E, and
+  the load profile needs a pragmatic fix (DATA-6).
 
 **DATA-2 — Resolution**
 - Quarter-hour, because the monthly peak is billed on the highest quarter-hour.
@@ -69,11 +71,10 @@ check the matching comment in the code.
   eliminate than here with perfect foresight (TIME-2).
 
 **DATA-8 — Reference building, large-consumer scale**
-- Hypothetical reference building, not a real site. 4,500 m² office at
-  115 kWh/m²/year
-- 4,500 m² office at 115 kWh/m²/year (Dutch average for offices, range
-  100–150) gives 517.5 MWh/year. The area is chosen so that the peak lands well
-  above the large-consumer threshold (3x80A, ~55 kVA) instead of right at it.
+- Hypothetical reference building, not a real site: a 4,500 m² office at
+  115 kWh/m²/year (Dutch average for offices, range 100–150) gives
+  517.5 MWh/year. The area is chosen so that the peak lands well above the
+  large-consumer threshold (3x80A, ~55 kVA) instead of right at it.
 - Peak: scaling the profile to this annual total gives 24.85 kWh in the
   busiest quarter-hour, i.e. 99.4 kW
   (517,500 kWh / profile sum 20,824.42 = 24.85 kWh per quarter-hour).
@@ -109,162 +110,143 @@ check the matching comment in the code.
 
 ---
 
-## V1 — dispatch_sim.py only (rule-based)
+## Battery (both models)
 
-**Battery**
-- **BAT-1** — Symmetric charge/discharge power — same power in both
-  directions (simplification, not physically correct — corrected in V2,
-  see BAT-7)
-- **BAT-2** — Discharging is lossless; charging losses occur only when charging
-- **BAT-3** — No degradation over time — capacity/efficiency remain
-  constant.
-  Degradation is therefore also deliberately **not** in the LP objective (no
-  cycle cost). Rationale: measured
-  equivalent full cycles/year (`main.py`, 2023 data) are RBC 102, LP
-  scenario A 487 (1.33/day), LP scenario B 264. That compares with ≥ 6000 cycles for the BOLT-241 (manufacturer's
-  specification, not verified, see DATA-9): even at 487/year ~12 years. At low
-  C-rates, ageing is mainly determined by time, temperature and throughput,
-  and hardly by depth of discharge (DoD) (Wang et al., 2011);
-  their tests started at C/2, this system runs at 99 kW / 241 kWh ≈ 0.41C.
-  A DoD-dependent cost is therefore not needed; a cost per kWh of throughput
-  is, but that is not implemented.
-- **BAT-4** — No minimum on/off time — battery switches freely
-- **BAT-5** — Efficiency/capacity constant, regardless of SoC, charging rate
-  or temperature
-- **BAT-6** — No self-discharge
+Both models use the same battery model.
 
-**Time**
-- **TIME-1** — No look-ahead — purely reactive, each quarter-hour on its own
-
-**Market/Grid**
-- **NET-1** — One fixed, static peak threshold for the whole year
-  (corrected in V2, see NET-4)
-- **NET-2** — Peak shaving responds only to import, not to export peaks
-- **NET-3** — Unlimited feed-in — no export limit/curtailment
-
-**Architecture**
-- **ARCH-1** — No costs/prices in the model itself — purely a physical
-  energy-flow simulation, the financial translation happens elsewhere
-- **ARCH-2** — Battery can structurally never charge from the grid — only
-  from PV surplus (corrected in V2, see ARCH-3)
-- **ARCH-5 — Symmetric import/export prices** — `compute_financial_metrics`
-  values import and export at the same day-ahead price. In
-  reality, export misses the avoided transport tariff that
-  self-consumption does save, and feed-in for large consumers is
-  usually compensated below the full import price
-  (market-price-linked supplier contract — for large consumers there is
-  no net metering (saldering), so no fixed 1-to-1 settlement to
-  fall back on). Direction of the error: this overvalues export, and therefore a
-  larger PV installation relative to a smaller one (see DATA-10). A quantitative
-  correction requires a real feed-in contract figure that is currently not
-  available — TODO. Remains in force unchanged for V2:
-  `optimize.py` does not use `main.py`'s `compute_financial_metrics`
-  itself, but the financial post-processing in `main.py` is identical for
-  both dispatch versions.
+- **BAT-1** — Symmetric power: the same power limit (`power_kw`) for charging
+  and discharging. A simplification.
+- **BAT-2** — Losses only on charging: the full round-trip efficiency is
+  applied when charging, discharging is lossless.
+- **BAT-3** — No degradation: capacity and efficiency stay constant over the
+  year, and cycling costs nothing in the LP objective.
+  - Why it matters: the LP cycles far more than the RBC (equivalent full
+    cycles per year, 2023: RBC 102, LP scenario A 487, LP scenario B 264), so
+    free cycling favours the LP. Its savings are optimistic on this count as
+    well as on perfect foresight (TIME-2).
+  - What drives wear here: at low C-rates (this system: 99 kW / 241 kWh ≈
+    0.41C), ageing is driven mainly by time, temperature and energy throughput,
+    and hardly by depth of discharge (Wang et al., 2011, on LFP cells). The
+    right correction is therefore a cost per kWh of throughput, not a
+    depth-of-discharge cost.
+  - Open question: how large that cost should be depends on how calendar and
+    cycle ageing combine. If the battery is replaced at the end of its calendar
+    life anyway, extra cycles cost little: 487 cycles per year still reaches
+    ≥ 6,000 cycles (DATA-9) only after ~12 years. If both add up, every cycle
+    shortens the battery's life and the cost per kWh is substantial.
+  - Not yet implemented; planned as a sensitivity analysis over a range of
+    throughput costs.
+- **BAT-4** — No minimum on/off time: the battery can switch every
+  quarter-hour.
+- **BAT-5** — Efficiency and capacity are constant, regardless of SoC, charging
+  rate or temperature.
+- **BAT-6** — No self-discharge.
 
 ---
 
-# V2 — dispatch_sim.py + optimize.py
+## Market & grid (both models)
 
-`dispatch_sim.py` does not disappear in V2 — it remains alongside
-`optimize.py`, and receives the fixes that are not a matter of algorithm but
-of correct physics or better parameters.
+Both models are costed with the same formula (`compute_financial_metrics` in
+`main.py`), which matches the LP objective.
 
-## Shared between both files in V2
+- **NET-2** — Peak reduction only targets import peaks, not export peaks.
+- **NET-3** — Unlimited feed-in: no export limit or curtailment.
+- **NET-4** — Monthly peak tariff: each month, the highest quarter-hour import
+  is billed per kW. Each model handles it differently:
+  - LP: one peak variable per calendar month; with perfect foresight it picks
+    the lowest achievable peak for each month.
+  - RBC: one discharge threshold for the whole year. It is chosen by running
+    the RBC for every threshold from 50 to 98 kW (steps of 2 kW,
+    `select_rbc_threshold`) and keeping the one with the lowest annual net cost
+    (2023: 52 kW). The rule itself never looks at prices (ARCH-1); only this
+    choice does.
+  - The threshold is chosen on the same year it is tested on (in-sample), with
+    hindsight a real controller would not have. This favours the RBC slightly.
+- **NET-5** — Energy tax (energiebelasting) at a fixed rate per imported kWh:
+  €0.03735, the marginal bracket 50,000–10 million kWh, 2026 rate excl. VAT,
+  applied to 2023 prices. Only on import, no net metering (saldering) for large
+  consumers. The higher rates on the first 50,000 kWh are paid in every
+  scenario, with or without battery, so they do not affect the savings; absolute
+  net costs are understated.
+- **NET-6** — Scenario B: a hypothetical double energy tax on storage, an extra
+  €0.03735 per kWh charged into the battery (default 0, scenario A). The debate
+  about double taxation of storage currently concerns small-consumer
+  connections; for standalone large-consumer connections an exemption applies
+  since 2022. Scenario B is therefore a stress test, not current policy for
+  this building, and an upper bound: PV charging is taxed too, whereas
+  self-generated, stored and self-consumed electricity is not taxed in reality.
+  The LP is re-solved for B; the RBC dispatch is price-agnostic and stays the
+  same, only its costs are recalculated.
+- **NET-7** — Dynamic (day-ahead) energy contract: all import and export is
+  settled at the hourly day-ahead price. This is the logical contract for a
+  building that uses its battery for arbitrage, and applies equally to the
+  no-battery reference, so the savings isolate the battery's effect. Not
+  modeled: (a) the supplier's markup on a dynamic contract, (b) the price risk
+  of a dynamic versus a fixed contract on the full building load, which is part
+  of the owner's decision but not of the battery's value, and (c) batteries
+  installed only for peak shaving or congestion behind a fixed-price contract:
+  there the ~€6,600 arbitrage component of the LP savings does not apply.
+- **NET-8** — Only the monthly peak component of the grid tariff is modeled.
+  The annual contracted capacity (GTV, "kW contract") is treated as a fixed
+  cost; exceeding it, which raises the GTV for the whole year, is not modeled.
+  Tariff figures are estimates, not verified against the Liander tariff sheet.
+- **ARCH-5** — Symmetric import and export prices: export is valued at the
+  full day-ahead price. In reality, export misses the avoided transport tariff
+  and energy tax, and large consumers are usually paid below the import price
+  for feed-in (no net metering). This overvalues export, and therefore larger
+  PV systems (DATA-10). A correction needs a real feed-in contract figure.
 
-**Battery**
-- **BAT-7** — Asymmetric charge/discharge power — corrects BAT-1.
-  **Planned, not yet implemented**: both files still use
-  `power_kw` for charging and discharging, so BAT-1 is effectively still in force.
-- BAT-2 through BAT-6 remain in force unchanged
+---
 
-**Market/Grid**
-- **NET-4** — Optimized peak threshold instead of a fixed annual threshold —
-  corrects NET-1. Internally in `optimize.py`: one peak variable per
-  calendar month. In `dispatch_sim.py` it remains one threshold for the whole
-  year, but it is no longer chosen by hand: `main.py`
-  (`select_rbc_threshold`) scans 50–98 kW in steps of 2 kW
-  (`DispatchConfig.threshold_scan_*`) and selects the threshold with the lowest
-  annual net cost (2023: 52 kW). Prices appear only in that scan;
-  the rule itself remains price-agnostic and reactive (ARCH-1, TIME-1). Note:
-  this is an ex-post choice on the same year (in-sample), and thus favourable
-  to the RBC.
-- **NET-5** — Energy tax (energiebelasting) as a fixed rate per imported kWh
-  (`GridTariffConfig.energy_tax_eur_per_kwh = 0.03735`): the marginal bracket
-  50,000–10 million kWh, 2026 rate excl. VAT, applied to 2023 prices.
-  Only on import, no net metering (saldering) (large consumer). Included both in the
-  LP objective and in `compute_financial_metrics`. The higher rates of the
-  first 50,000 kWh are not modeled: that is a fixed cost, not
-  decision-relevant.
-- **NET-6** — Scenario B: hypothetical double energy tax on storage,
-  an additional 0.03735 EUR per kWh that goes into the battery
-  (`storage_charge_tax_eur_per_kwh`, default 0.0 = scenario A). Based on
-  the debate about double energy taxation on storage, which in
-  reality mainly applies behind small-consumer connections. It is
-  an upper bound, because PV charging (all `charge_kwh`) is taxed as well. The
-  LP is re-solved for B; the RBC dispatch is price-agnostic and stays
-  the same, only its costs are recalculated.
-- See ARCH-5 (under V1 — Architecture) for export/import priced symmetrically
-  — applies identically to V2, no separate NET ID needed.
-- NET-2, NET-3 remain in force unchanged
+## Rule-based model (`dispatch_sim.py`)
 
-**Architecture**
-- **ARCH-3** — Grid charging becomes possible — corrects ARCH-2.
-  Implemented in both files. `optimize.py`: free, the solver
-  decides. `dispatch_sim.py`: standard peak-shaving rule — as long as the
-  import (kW) stays below the threshold, charge from the grid with at most the
-  remaining headroom up to the threshold, limited by `power_kw` (minus what is already
-  being charged from PV) and max SoC, with the same charging loss as PV charging
-  (BAT-2). Side effect: RBC self-consumption drops (2023, threshold 52 kW: 83.1%
-  without vs. 78.6% with grid charging; without battery 78.3%), because the
-  battery is more often full when PV surplus arrives: peak shaving and
-  self-consumption compete for the same SoC, and the threshold makes that
-  trade-off implicitly. The net cost of the RBC at the same threshold is also slightly
-  higher with grid charging (€63,558 vs. €63,300).
+- **TIME-1** — No look-ahead: purely reactive, each quarter-hour on its own.
+  Inherent to a rule, not something to be fixed.
+- **ARCH-1** — No prices in the model: a physical energy-flow simulation; the
+  costs are calculated afterwards in `main.py`.
+- **ARCH-3** — Grid charging allowed, corrects ARCH-2. Rule: as long as import
+  stays below the threshold, charge from the grid with at most the remaining
+  headroom up to the threshold, limited by power (minus what is already charged
+  from PV) and max SoC. Side effect: self-consumption drops (2023, threshold
+  52 kW: 83.1% without vs. 78.6% with grid charging; 78.3% without battery),
+  because the battery is more often full when PV surplus arrives. Peak shaving
+  and self-consumption compete for the same SoC, and the threshold makes that
+  trade-off implicitly. At the same threshold, the RBC with grid charging is
+  also slightly more expensive (€63,558 vs. €63,300). In the LP, grid charging
+  is free: the solver decides.
 
-## dispatch_sim.py specific (remains rule-based)
+---
 
-**Time**
-- TIME-1 remains in force unchanged — still no look-ahead,
-  inherent to a reactive rule, not something that gets "fixed"
+## LP optimization (`optimize.py`)
 
-**Architecture**
-- ARCH-1 remains in force unchanged for this file — still no
-  costs in the model itself, the financial translation happens elsewhere
+- **TIME-2** — Perfect foresight over the full year: the LP result is an upper
+  bound on what a real controller could achieve.
+- **ARCH-4** — Costs sit directly in the objective; there is no separate
+  financial layer.
+- **BAT-8** — Simultaneous charging and discharging is not excluded. Excluding
+  it requires binary variables, which would turn the LP into a MILP: much
+  slower over 35,040 quarter-hours, and without a guaranteed global optimum in
+  practical time.
+  - Why it happens: at negative prices, wasting energy through charging losses
+    earns money, so charging and discharging at the same time is optimal for
+    the LP.
+  - Checked (2023 data), scenario A: 399 of 35,032 quarter-hours, all at a
+    negative price (1,256 quarter-hours < 0). 546 kWh is lost, at most
+    ~€270/year even at the lowest price (−500 EUR/MWh): ~3% of the LP savings.
+    Scenario B: 16 quarter-hours, also all at a negative price.
+  - The effect is small and reported, so the model stays an LP.
+- **BAT-9** — End SoC ≥ initial SoC at the end of the year. Without this, the
+  LP drains the battery for free at the end and counts that energy as savings.
+  The RBC has no such condition (2023: ends at 208.8 kWh vs. 120.5 kWh at the
+  start, a small disadvantage for the RBC).
 
-## optimize.py
+---
 
-**Time**
-- **TIME-2** — Perfect forecast within the horizon — replaces TIME-1
-  for this file ("no look-ahead" no longer applies)
+## Context, not an assumption
 
-**Architecture**
-- **ARCH-4** — Costs sit directly in the objective, no separate
-  financial layer — replaces ARCH-1 for this file
-
-**Battery**
-- **BAT-8** — Assumed that charging and discharging never happen simultaneously
-  because the solver always chooses the most efficient solution. **Checked
-  (2023 data): does not hold at negative prices.** Scenario A: 399 of the
-  35,032 quarter-hours with simultaneous charging and discharging, all at a
-  negative price (1,256 quarter-hours < 0). In those, 546 kWh is lost to
-  charging losses; even valued at the lowest price
-  (−500 EUR/MWh) that is at most ~€270/year, ~3% of the LP savings.
-  Scenario B: 16 quarter-hours, also all at a negative price. Deliberately
-  not solved with binaries: the model remains an LP, because a MILP over
-  35,040 quarter-hours solves much more slowly and does not give a guaranteed global optimum
-  within practical time. The effect is financially small and visibly
-  reported.
-- **BAT-9** — End SoC ≥ initial SoC (`initial_soc_fraction`) at the end
-  of the horizon. Without this condition, the LP drains the battery for free at the
-  end and counts that energy as savings. The RBC does not have this
-  condition (2023: ends at 208.8 kWh vs. 120.5 kWh at the start, a
-  small disadvantage for the RBC).
-
-## Important context, not an assumption
-
-*Context, not an assumption*: at 99 kW, this system stays below the 100 kW
-threshold above which a congestion management contract becomes relevant
-(RVO Flex-e conditions: the power of the measure, not of the
-connection, is decisive). A factual given, not a choice — mentioned
-because it places the 99 kW choice in a broader regulatory context.
+If the building is in a grid-congested area, the battery may qualify for the
+Flex-e subsidy (RVO), which covers up to 40% of the investment for large
+consumers (2026 conditions). At 99 kW it falls in the group below 100 kW,
+which does not require a congestion management contract with the grid
+operator; the 100 kW limit refers to the power of the measure, not of the
+connection. Investment costs and subsidies are not yet in the model.
