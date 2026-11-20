@@ -235,7 +235,8 @@ Both models are costed with the same formula (`compute_financial_metrics` in
   - Checked (2023 data), scenario A: 398 of 35,032 quarter-hours, all at a
     negative price (1,256 quarter-hours < 0). 546 kWh is lost, at most
     ~€270/year even at the lowest price (−500 EUR/MWh): ~3% of the LP savings.
-    Scenario B: 16 quarter-hours, also all at a negative price.
+    Scenario B: 16 quarter-hours, also all at a negative price (checked with
+    scripts/check_bat8.py).
   - The effect is small and reported, so the model stays an LP.
 - **BAT-9** — End SoC ≥ initial SoC at the end of the year. Without this, the
   LP drains the battery for free at the end and counts that energy as savings.
