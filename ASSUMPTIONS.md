@@ -34,28 +34,25 @@ check the matching comment in the code.
   constant within each hour.
 
 **DATA-5 — PV data (PVGIS)**
-- By default (`usehorizon=True`, no `userhorizon`), PVGIS uses a
-  terrain shading model based on an elevation map — it sees natural
-  elevations (hills), but not buildings. If the reference building is on
-  a business park/in an urban area with taller neighbouring buildings that
-  cast shade early/late in the day, PVGIS structurally underestimates those losses,
-  without any warning in the output — the PV yield is then
-  overestimated.
+- PVGIS has hourly resolution, so short cloud transients within the hour are not represented.
+  Together with the smoothed load profile (DATA-7), the model sees fewer and
+  milder short-term net-load peaks than a real building.
+- PVGIS's default shading model uses an elevation map: it sees hills, but not
+  buildings. Shading from taller neighbouring buildings is not included, so PV
+  yield may be overestimated.
 
 **DATA-6 — Load data (Liander K&O profile)**
-- Normalized profile, not a real measurement — therefore also no real
-  clock-change irregularity (365×96 quarter-hours, no gaps). Making it
-  tz-aware therefore requires a deliberate, pragmatic choice
-  (`nonexistent="shift_forward"`, `ambiguous=True`) instead of a
-  real DST correction as for prices/PV, which do run on real
-  measurements.
-  Note what this profile actually is: Liander's own K&O standard profile,
-  built from telemetry of large consumers (grootverbruikers) and used by Liander itself
-  to estimate new large-consumer customers (see external
-  documentation MOOI EIGEN SBI-profielen). The profile shape therefore determines
-  nothing about whether the modeled building is a small or large consumer (klein- of grootverbruik) — that is
-  purely a function of the scale (area_m2/annual_kwh_per_m2, see DATA-8),
-  not of this file.
+- Liander's own standard profile for offices, built from telemetry of large
+  consumers and used by Liander to estimate new large-consumer connections
+  (source: Liander, "MOOI EIGEN SBI-profielen"). It is a normalized shape, not
+  a measurement of one building; the absolute level comes from the scaling in
+  DATA-8. This matches the modeled building: at that scale its peak (99.4 kW)
+  is well above the large-consumer threshold.
+- Because it is a normalized 365 × 96 profile without real clock changes, it
+  is made tz-aware pragmatically: the missing hour in March is shifted forward
+  (duplicates dropped), and the double hour in October is assigned to summer
+  time. Prices and PV, which are real time series, are converted exactly,
+  including the clock changes (DATA-1).
 
 **DATA-7 — Load profile smoothing (coincidence)**
 - Because the Liander K&O profile is a mathematical average of hundreds of
