@@ -20,20 +20,11 @@ check the matching comment in the code.
 
 ## Data & reference case (applies to both V1 and V2 — concerns the input, not the calculation)
 
-These are not assumptions about how the calculation works (that is under V1/V2
-below) — this is about what the data itself represents and where its
-limitations lie. Applies identically regardless of which
-calculation model you use.
-
 **DATA-1 — Time zone**
-- All three data sources (load, PV, prices) are explicitly converted to
-  Europe/Amsterdam, not UTC. Reason: the capacity tariff and
-  dispatch decisions are tied to local clock time (e.g.
-  "evening peak at 18:00"), not to UTC. The price paid for this:
-  the clock changes in March/October must be handled explicitly
-  (see DATA-5/DATA-6 below) — UTC would have avoided that complexity,
-  but would make results less directly recognizable relative to the
-  actual local usage situation.
+- All data (load, PV, prices) is converted to Europe/Amsterdam, not UTC: the
+  Liander profile is in local time, and the monthly peak is billed per calendar
+  month in local time. The cost is that clock changes must be handled per source
+  (DATA-5, DATA-6).
 
 **DATA-2 — Resolution**
 - Quarter-hour, identical for both files — no V1/V2 difference. This was
