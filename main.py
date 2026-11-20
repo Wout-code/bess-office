@@ -1,16 +1,14 @@
-"""End-to-end baseline + LP dispatch run, using real PV, load, and price data.
+"""End-to-end run: no battery, rule-based control (RBC) and LP optimization.
 
-Unlike dispatch_sim.py's and optimize.py's own __main__ blocks (which test
-the dispatch RULES/LP against small, synthetic, hand-verifiable data), this
-script runs the REAL pipeline: fetch actual PV generation, actual building
-consumption, and actual day-ahead prices, align them to a common
-quarter-hour resolution, run BOTH dispatch methods, and translate the
-results to EUR -- runnable directly from the terminal with `uv run main.py`.
+Unlike the __main__ blocks of dispatch_sim.py and optimize.py, which test the
+rules and the LP on small synthetic data, this script runs the full pipeline:
+load PV (PVGIS), consumption (Liander standard profile, scaled to the
+reference building) and day-ahead prices (ENTSO-E), align them to quarter-
+hours, run both dispatch methods and translate the results to EUR.
 
-The result is a quantitative comparison between no battery, the
-rule-based baseline (RBC, dispatch_sim.py) and the LP optimization
-(optimize.py), on both peak reduction and euros, for scenario A (base)
-and B (double energy tax on storage, NET-6).
+Output: a comparison of no battery, RBC (dispatch_sim.py) and LP (optimize.py)
+on peak reduction and euros, for scenario A (base) and B (double energy tax on
+storage, NET-6), plus a cost breakdown plot. Run with `uv run main.py`.
 """
 
 import dataclasses
@@ -33,36 +31,33 @@ RESULTS_DIR = Path(__file__).parent / "results"
 def compute_financial_metrics(
     result: pd.DataFrame, prices_eur_mwh: pd.Series, grid_tariff, timestep_hours: float
 ) -> dict:
-    """Translate a dispatch result (kWh) into EUR, as a separate step
-    after the dispatch itself.
+    """Translate a dispatch result (kWh) into EUR.
 
-    dispatch_sim.py is kWh-only by design (ARCH-1); optimize.py has its
-    costs inside the objective (ARCH-4). This function recomputes the cost
-    of BOTH results with one identical formula, so the comparison is fair.
-    It uses the same components as optimize.py's objective:
+    dispatch_sim.py has no prices (ARCH-1); optimize.py has its costs inside
+    the objective (ARCH-4). This function recomputes the cost of both results
+    with one identical formula, so the comparison is fair. Same components as
+    the LP objective:
 
-    - import cost and export revenue at the day-ahead price (ARCH-5),
+    - import cost and export revenue at the day-ahead price (NET-7, ARCH-5),
     - transport tariff per kWh imported,
     - energy tax per kWh imported, no netting (NET-5),
     - storage tax per kWh charged into the battery (NET-6, 0 in scenario A),
     - monthly peak tariff per kW of the highest quarter-hour import per
-      calendar month.
+      calendar month (NET-4).
 
-    The annual GTV/contract-capacity component is deliberately not
-    modeled (see config.py GridTariffConfig). Works for the output of
-    run_baseline_dispatch and run_lp_dispatch alike -- both return the
-    same columns.
+    The GTV/contracted-capacity component is not modeled (NET-8). Works for
+    the output of run_baseline_dispatch and run_lp_dispatch alike: both return
+    the same columns.
     """
     prices_eur_kwh = prices_eur_mwh / 1000  # ENTSO-E supplies EUR/MWh
 
-    import_cost = (result["grid_import_kwh"] * prices_eur_kwh).sum()  # ARCH-5
+    import_cost = (result["grid_import_kwh"] * prices_eur_kwh).sum()
     export_revenue = (result["grid_export_kwh"] * prices_eur_kwh).sum()
     transport_cost = result["grid_import_kwh"].sum() * grid_tariff.transport_tariff_eur_per_kwh
-    energy_tax_cost = result["grid_import_kwh"].sum() * grid_tariff.energy_tax_eur_per_kwh  # NET-5
-    storage_tax_cost = result["charge_kwh"].sum() * grid_tariff.storage_charge_tax_eur_per_kwh  # NET-6
+    energy_tax_cost = result["grid_import_kwh"].sum() * grid_tariff.energy_tax_eur_per_kwh
+    storage_tax_cost = result["charge_kwh"].sum() * grid_tariff.storage_charge_tax_eur_per_kwh
 
-    # Monthly peak cost: same formula as optimize.py's objective (Liander's
-    # "kW max. mnd" component, see config.py GridTariffConfig docstring).
+    # Monthly peak: kWh per timestep -> kW, highest per calendar month.
     peak_import_kw_per_step = result["grid_import_kwh"] / timestep_hours
     monthly_peak_kw = peak_import_kw_per_step.groupby(result.index.to_period("M")).max()
     peak_cost = monthly_peak_kw.sum() * grid_tariff.monthly_peak_tariff_eur_per_kw
@@ -82,8 +77,8 @@ def compute_financial_metrics(
 
 
 def equivalent_full_cycles(result: pd.DataFrame, battery: BatteryConfig) -> float:
-    """Equivalent full cycles over the result's horizon: total discharged
-    energy divided by the usable capacity (max - min SoC)."""
+    """Equivalent full cycles over the horizon: total discharged energy divided
+    by the usable capacity (max - min SoC)."""
     usable_kwh = (battery.max_soc_fraction - battery.min_soc_fraction) * battery.capacity_kwh
     return result["discharge_kwh"].sum() / usable_kwh
 
@@ -96,12 +91,12 @@ def select_rbc_threshold(
     grid_tariff,
     timestep_hours: float,
 ) -> tuple[float, pd.Series]:
-    """Scan RBC peak thresholds and return the one with the lowest annual
-    net cost, plus the net cost per scanned threshold (NET-4).
+    """Scan RBC thresholds and return the one with the lowest annual net cost,
+    plus the net cost per scanned threshold (NET-4).
 
-    This keeps prices out of dispatch_sim.py (ARCH-1): the rule itself is
-    price-agnostic, only the choice of threshold happens here, ex post on the
-    full year (in-sample, and thus favourable to the RBC).
+    Prices stay out of dispatch_sim.py (ARCH-1): the rule itself never looks at
+    prices, only the choice of threshold does. The choice is made on the same
+    year it is tested on (in-sample), which favours the RBC.
     """
     cfg = CONFIG.dispatch
     thresholds_kw = np.arange(
@@ -119,10 +114,8 @@ def select_rbc_threshold(
 
 
 def print_dispatch_report(label: str, result: pd.DataFrame, metrics: dict, financials: dict) -> None:
-    """Print one dispatch method's results, with the method's name in
-    every header -- without that label it is impossible to tell whether a
-    number belongs to the RBC baseline or the LP optimization once two
-    results are shown side by side."""
+    """Print one dispatch method's results, with its name in every line so the
+    RBC and LP numbers cannot be mixed up."""
     print(f"=== {label} ===")
     print(f"Peak without battery: {metrics['peak_import_no_battery_kw']:.2f} kW")
     print(f"Peak with battery ({label}): {metrics['peak_import_with_battery_kw']:.2f} kW")
@@ -146,26 +139,17 @@ def print_dispatch_report(label: str, result: pd.DataFrame, metrics: dict, finan
 
 
 def main() -> None:
-    # PV: PVGIS supplies hourly resolution -- upsample to quarter-hours
-    # (interpolate, don't downsample -- otherwise you average away the
-    # quarter-hour peak of the load, exactly the opposite of what you want).
-    pv = get_pv_profile()  # power in W, not energy
+    # PV: hourly from PVGIS, interpolated to quarter-hours rather than
+    # averaging the load to hours, so the quarter-hour peak is kept (DATA-2).
+    pv = get_pv_profile()  # power in W
     pv_quarter_w = pv.resample("15min").interpolate("linear")  # still W
+    # Convert to energy only now: interpolating power is physically correct,
+    # and kWh needs the final timestep length.
+    pv_quarter = pv_quarter_w * CONFIG.sim.timestep_hours / 1000  # kWh per quarter-hour
 
-    # W -> kWh per quarter-hour: power x duration, only do this here (not
-    # earlier), because interpolating power over time is physically
-    # correct, but the conversion to energy needs the final
-    # timestep size.
-    pv_quarter = pv_quarter_w * CONFIG.sim.timestep_hours / 1000
-
-    # Load: fetch the profile shape (Liander K&O, already quarter-hour
-    # resolution) separately from the scale. peak_kwh_per_quarter is NOT a
-    # fixed building property -- it depends both on the target annual
-    # consumption (area_m2 x annual_kwh_per_m2, externally verifiable) and
-    # on how peaky THIS specific profile is (relative_profile.sum() --
-    # changes if you ever switch profile files). Keep that dependency
-    # explicit here instead of hidden in a separate config constant (see
-    # ASSUMPTIONS.md for the discussion).
+    # Load: profile shape (Liander, already quarter-hourly) times the scale
+    # derived from area and intensity (DATA-8). The scale depends on both the
+    # building and this profile's shape, so it is derived here, not stored.
     relative_profile = get_relative_profile()
     peak_kwh_per_quarter = derive_peak_kwh_per_quarter(
         area_m2=CONFIG.building.area_m2,
@@ -174,18 +158,18 @@ def main() -> None:
     )
     load = relative_profile * peak_kwh_per_quarter
 
-    # Prices: 2023 was still hourly resolution (before the SDAC 15-min
-    # transition of Oct 2025) -- ffill to quarter-hours, don't interpolate,
-    # because the price really was 1 value per hour, not a gradual transition.
+    # Prices: hourly in 2023 (before the 15-minute market of October 2025), so
+    # each hour's price is held constant over its quarter-hours, not
+    # interpolated (DATA-2).
     prices = get_day_ahead_prices(
         pd.Timestamp(f"{CONFIG.pv.year}-01-01", tz="Europe/Amsterdam"),
         pd.Timestamp(f"{CONFIG.pv.year + 1}-01-01", tz="Europe/Amsterdam"),
     )
     prices_quarter = prices.resample("15min").ffill()
 
-    # Align: all three are tz-aware/quarter-hour, but PV (interpolated)
-    # and prices (ffilled) can run slightly differently at the edges
-    # than load (original) -- inner join on what actually overlaps.
+    # Align: keep only the quarter-hours present in both PV and load (they can
+    # differ at the year's edges and around the clock changes), then match the
+    # prices to that index.
     pv_quarter, load = pv_quarter.align(load, join="inner")
     prices_quarter = prices_quarter.reindex(load.index, method="ffill")
 
@@ -196,8 +180,7 @@ def main() -> None:
     print(f"Timesteps with PV surplus: {(surplus > 0).sum()} of {len(surplus)}")
     print()
 
-    # --- RBC (Rule-Based Control): rule-based baseline, dispatch_sim.py ---
-    # Choose the threshold fairly: scan for the lowest annual net cost (NET-4).
+    # --- RBC: choose the threshold with the lowest annual net cost (NET-4) ---
     rbc_threshold_kw, threshold_scan = select_rbc_threshold(
         pv_quarter, load, prices_quarter, CONFIG.battery, CONFIG.grid_tariff, CONFIG.sim.timestep_hours
     )
@@ -208,8 +191,8 @@ def main() -> None:
     print(f"Selected RBC threshold: {rbc_threshold_kw:.0f} kW")
     print()
 
-    # --- Reference: no battery. Same RBC function with a battery of
-    # 0 kWh / 0 kW, so columns and energy balance are guaranteed identical.
+    # --- Reference: no battery. The RBC function with a 0 kWh / 0 kW battery,
+    # so columns and energy balance are identical by construction.
     no_battery_result = run_baseline_dispatch(
         pv_quarter,
         load,
@@ -225,6 +208,7 @@ def main() -> None:
     )
     print_dispatch_report("No battery", no_battery_result, no_battery_metrics, no_battery_financials)
 
+    # --- RBC ---
     rbc_result = run_baseline_dispatch(
         pv_quarter,
         load,
@@ -242,9 +226,8 @@ def main() -> None:
     )
     print_dispatch_report("RBC (baseline)", rbc_result, rbc_metrics, rbc_financials)
 
-    # --- LP optimization: optimize.py. NOTE: this solves an LP over the
-    # full annual horizon at quarter-hour resolution (~35,000 timesteps) --
-    # this can take a few minutes, depending on your CBC installation.
+    # --- LP: one LP over the full year at quarter-hour resolution (~35,000
+    # timesteps); the slowest step of the pipeline.
     lp_result = run_lp_dispatch(
         pv_quarter,
         load,
@@ -253,11 +236,8 @@ def main() -> None:
         CONFIG.grid_tariff,
         timestep_hours=CONFIG.sim.timestep_hours,
     )
-    # compute_dispatch_metrics is dispatch-method-agnostic (it only looks
-    # at the columns pv_kwh/load_kwh/grid_import_kwh/grid_export_kwh),
-    # so it is reusable for the LP result. peak_threshold_kw here is
-    # purely a descriptive metric (how much reduction relative to that
-    # threshold), not something the LP itself optimizes against.
+    # compute_dispatch_metrics only uses the shared columns, so it works for the
+    # LP too. The threshold is only echoed back; the LP does not use it.
     lp_metrics = compute_dispatch_metrics(
         lp_result,
         peak_threshold_kw=rbc_threshold_kw,
@@ -286,8 +266,8 @@ def main() -> None:
     print()
 
     # --- Scenario B: hypothetical double energy tax on storage (NET-6) ---
-    # The RBC is price-agnostic (ARCH-1): its dispatch stays the same, only the
-    # costs are recalculated. The LP is re-solved.
+    # The RBC never looks at prices (ARCH-1), so its dispatch stays the same and
+    # only its costs are recalculated. The LP is re-solved.
     tariff_b = dataclasses.replace(
         CONFIG.grid_tariff, storage_charge_tax_eur_per_kwh=CONFIG.grid_tariff.energy_tax_eur_per_kwh
     )
@@ -297,7 +277,7 @@ def main() -> None:
     )
     lp_financials_b = compute_financial_metrics(lp_result_b, prices_quarter, tariff_b, CONFIG.sim.timestep_hours)
 
-    # Without a battery charge_kwh is 0 everywhere, so B == A for this scenario.
+    # Without a battery nothing is charged, so B equals A here.
     no_battery_financials_b = compute_financial_metrics(
         no_battery_result, prices_quarter, tariff_b, CONFIG.sim.timestep_hours
     )
