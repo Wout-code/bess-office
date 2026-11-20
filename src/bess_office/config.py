@@ -4,65 +4,44 @@ from pathlib import Path
 
 @dataclass
 class BatteryConfig:
-    # BOLT-241 (Boltainer, NL) -- corrects DATA-4, see ASSUMPTIONS.md DATA-9.
-    # 241 kWh capacity; power options 49/60/99/120 kW, 99 kW chosen
-    # based on the calculated peak (99.4 kW, see derive_peak_kwh_per_quarter).
-    # NOTE: usable capacity (after min/max SoC) and exact round-trip
-    # efficiency of this product have not been verified separately -- the
-    # min/max_soc_fraction and round_trip_efficiency below are still
-    # the old SigenStor assumptions, not product-specific for the BOLT-241.
+    # Boltainer BOLT-241 (LFP), see ASSUMPTIONS.md DATA-9. 241 kWh; power
+    # options 49/60/99/120 kW, 99 kW chosen to match the 99.4 kW peak.
     capacity_kwh: float = 241.0
     power_kw: float = 99.0
-    round_trip_efficiency: float = 0.90  # TODO: look up BOLT-241-specific figure
-    min_soc_fraction: float = 0.10       # TODO: same
-    max_soc_fraction: float = 0.95       # TODO: same
+    round_trip_efficiency: float = 0.90  # not in datasheet, typical LFP value (DATA-9)
+    min_soc_fraction: float = 0.10       # not in datasheet, typical LFP value (DATA-9)
+    max_soc_fraction: float = 0.95       # not in datasheet, typical LFP value (DATA-9)
     initial_soc_fraction: float = 0.50
 
 
 @dataclass
 class PVConfig:
+    # Delft (hypothetical site, DATA-8).
     latitude: float = 52.01
     longitude: float = 4.36
-    # Export-aware sizing (~33% annual coverage) -- corrects the
-    # old 25 kWp, see ASSUMPTIONS.md DATA-10. Deliberately not aimed at full
-    # annual consumption coverage (that would be ~673 kWp): for large consumers
-    # export is structurally valued lower than self-consumption (see
-    # ARCH-5), so an installation that mainly exports is economically
-    # less efficient than its kWp figure suggests.
+    # 190 kWp, ~36% of annual consumption (DATA-10): fits on the roof and keeps
+    # most PV consumed on site, since export is valued lower than
+    # self-consumption for large consumers (ARCH-5).
     peak_power_kw: float = 190.0
     tilt: float = 12.0
+    # 180 = south in pvlib's north-zero convention (north=0, east=90,
+    # south=180, west=270, since pvlib 0.10.0). pyproject.toml requires
+    # pvlib>=0.15.2, so no manual conversion to PVGIS' own convention is needed.
     azimuth: float = 180.0
-    # 180 = south, verified against pvlib's north-zero convention
-    # (north=0, east=90, south=180, west=270) since pvlib 0.10.0.
-    # pyproject.toml requires pvlib>=0.15.2, so this value is correct
-    # without manual conversion to PVGIS' own (different) convention.
     mounting_place: str = "free"
     system_loss_pct: float = 14.0
     year: int = 2023
     save_raw: bool = True
 
-
 @dataclass
 class BuildingConfig:
-    # Large-consumer scale (grootverbruik, >3x80A / 55 kVA), deliberately
-    # chosen -- corrects DATA-3, see ASSUMPTIONS.md DATA-8.
-    #
-    # annual_kwh_per_m2 remains the Dutch average office/education reference
-    # (Energy Shift, range 100-150) -- that does not change with scale.
-    # area_m2 has been increased so that the resulting peak (via
-    # derive_peak_kwh_per_quarter() in fetch_load.py) ends up well above the
-    # 55 kVA threshold:
-    #
-    #   sum(relative_profile) on KO_KANTOOR_ONDERWIJS, verified via
-    #   get_relative_profile().sum(): 20,824.42
-    #   4,500 m2 x 115 kWh/m2/year = 517,500 kWh/year
-    #   -> peak_kwh_per_quarter = 517,500 / 20,824.42 = 24.85 kWh/quarter-hour
-    #   -> peak = 99.4 kW  (verified via get_relative_profile().sum())
+    # Hypothetical large-consumer office (DATA-8): 4,500 m2 x 115 kWh/m2/year
+    # = 517.5 MWh/year, chosen so the peak lands well above the
+    # large-consumer threshold (3x80A, ~55 kVA). The peak (99.4 kW) is not set
+    # here: it also depends on the profile shape, and is derived in main.py
+    # via derive_peak_kwh_per_quarter().
     area_m2: float = 4500.0
-    annual_kwh_per_m2: float = 115.0    # Dutch average, range 100-150 (Energy Shift)
-    # peak_kwh_per_quarter is deliberately not here -- it is not a pure
-    # building property (it also depends on the chosen profile shape), and is
-    # derived in main.py via derive_peak_kwh_per_quarter().
+    annual_kwh_per_m2: float = 115.0  # Dutch office average, range 100-150 (Energy Shift)
 
 
 @dataclass
