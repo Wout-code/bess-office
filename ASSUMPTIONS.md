@@ -27,12 +27,11 @@ check the matching comment in the code.
   (DATA-5, DATA-6).
 
 **DATA-2 — Resolution**
-- Quarter-hour, identical for both files — no V1/V2 difference. This was
-  always a `main.py` choice (which data you supply), never something in
-  `dispatch_sim.py`/`optimize.py` itself: both simply take
-  `timestep_hours` as a parameter and compute with whatever they get. `main.py`
-  upsamples PV to quarter-hours (instead of downsampling load to hours), so that the
-  billing-relevant quarter-hour peak is not averaged away.
+- Quarter-hour, because the monthly peak is billed on the highest quarter-hour.
+  PV (hourly from PVGIS) is interpolated linearly to quarter-hours rather than
+  averaging the load to hours, so the quarter-hour peak is preserved. Prices
+  (hourly in 2023, before the 15-minute market of October 2025) are held
+  constant within each hour.
 
 **DATA-5 — PV data (PVGIS)**
 - By default (`usehorizon=True`, no `userhorizon`), PVGIS uses a
