@@ -54,43 +54,36 @@ check the matching comment in the code.
   time. Prices and PV, which are real time series, are converted exactly,
   including the clock changes (DATA-1).
 
-**DATA-7 — Load profile smoothing (coincidence)**
-- Because the Liander K&O profile is a mathematical average of hundreds of
-  buildings, the curve is smoothed (coincidence factor). The peaks of
-  a real building are higher, so the value of peak reduction is in this
-  model probably underestimated. Those real peaks are, however, short and
-  erratic, and therefore in practice harder to predict and to
-  eliminate than here with a perfect forecast (TIME-2).
+**DATA-7 — Load profile smoothing**
+- The Liander K&O profile averages many buildings, and their peaks do not
+  coincide, so the curve is smoother than that of any single building. A real
+  building with the same annual consumption has higher, sharper peaks. Two
+  consequences: the 99.4 kW peak (DATA-8) is lower than a real building's, and
+  the value of peak reduction is probably underestimated. Real peaks are,
+  however, short and erratic, so in practice they are harder to predict and to
+  eliminate than here with perfect foresight (TIME-2).
 
 **DATA-8 — Reference building, large-consumer scale**
-- 4,500 m² instead of 590 m², annual_kwh_per_m2 unchanged (115 kWh/m²/year,
-  Dutch average, does not change with scale). Deliberately chosen so that the
-  calculated peak ends up well above the large-consumer threshold (55 kVA / 3x80A),
-  instead of sitting right at it. Calculation:
-  sum(relative_profile) on KO_KANTOOR_ONDERWIJS, verified via
-  `get_relative_profile().sum()`: 20,824.42. 4,500 x 115 = 517,500
-  kWh/year -> peak_kwh_per_quarter = 517,500 / 20,824.42 = 24.85
-  kWh/quarter-hour -> peak = 99.4 kW (verified via notebook run).
-  peak_kwh_per_quarter is no longer a separate BuildingConfig field, but is
-  derived in main.py via derive_peak_kwh_per_quarter() (fetch_load.py)
-  — prevents area_m2 and peak_kwh_per_quarter from silently drifting
+- 4,500 m² office at 115 kWh/m²/year (Dutch average for offices, range
+  100–150) gives 517.5 MWh/year. The area is chosen so that the peak lands well
+  above the large-consumer threshold (3x80A, ~55 kVA) instead of right at it.
+- Peak: scaling the profile to this annual total gives 24.85 kWh in the
+  busiest quarter-hour, i.e. 99.4 kW
+  (517,500 kWh / profile sum 20,824.42 = 24.85 kWh per quarter-hour).
+- The peak is derived from area and intensity in code
+  (`derive_peak_kwh_per_quarter`), not set separately, so the two cannot drift
   apart.
 
-**DATA-9 — Battery model, BOLT-241**
-- Boltainer BOLT-241 (Dutch manufacturer): 241 kWh capacity, power options
-  49/60/99/120 kW. 99 kW chosen based on the calculated peak (99.4 kW,
-  DATA-8) — same "power ≈ peak" logic as in the original
-  SigenStor choice. Capacity checked against the same
-  capacity-to-daily-consumption ratio as before (~19%): new
-  daily average 517,500/365 ≈ 1,418 kWh/day, 19% of that ≈ 270 kWh — 241
-  kWh is slightly below that ratio (cycling slightly more often/deeper than with the old
-  ratio).
-  NOTE: found via a single search, not thoroughly verified for
-  price/availability/delivery time. Usable capacity (after
-  min/max SoC) and round-trip efficiency of this specific product have
-  not been looked up separately — BatteryConfig still uses the old,
-  generic SigenStor assumptions (90%/10%/95%) as a placeholder for these. TODO:
-  verify.
+**DATA-9 — Battery, BOLT-241**
+- Boltainer BOLT-241 (Dutch manufacturer, LFP): 241 kWh, power options
+  49/60/99/120 kW. 99 kW chosen to match the 99.4 kW peak (DATA-8), so the
+  battery could in principle cover the full peak. Capacity is about 17% of the
+  average daily consumption (1,418 kWh/day); no further sizing optimization was
+  done.
+- Round-trip efficiency and usable SoC range are not stated in the datasheet.
+  The model uses typical LFP values: 90% round-trip and SoC 10–95%. Price and
+  availability are not verified. Manufacturer cycle life: ≥ 6,000 cycles,
+  without stated test conditions (see BAT-3).
 
 **DATA-10 — PV sizing, export-aware**
 - 190 kWp instead of 25 kWp, same underlying ratio as the
