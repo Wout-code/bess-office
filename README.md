@@ -10,10 +10,11 @@ large-consumer grid connection (grootverbruik). At quarter-hour resolution over 
 - **RBC** (rule-based control): peak shaving with grid charging, threshold chosen for the lowest annual cost;
 - **LP**: linear optimization (Pyomo + CBC) that minimizes all cost components simultaneously.
 
-The inputs are real data: PVGIS (PV), ENTSO-E (day-ahead prices NL) and the Liander standard profile
-for offices (consumption). Every assumption has an ID in [`ASSUMPTIONS.md`](ASSUMPTIONS.md).
+The inputs are public data: PVGIS (simulated PV), ENTSO-E (actual day-ahead prices NL) and the Liander
+standard profile for offices (consumption). Every assumption has an ID in [`ASSUMPTIONS.md`](ASSUMPTIONS.md).
 
 ## Reference case
+
 A hypothetical office building, not a real site: consumption comes from a standard profile scaled to
 a typical Dutch office (DATA-8), PV is simulated for Delft. The battery is a commercially available
 product, the Boltainer BOLT-241; its efficiency and SoC limits are typical LFP values (DATA-9).
@@ -22,9 +23,9 @@ product, the Boltainer BOLT-241; its efficiency and SoC limits are typical LFP v
 |---|---|
 | Building | 4,500 m² office, 517.5 MWh/year, peak demand 99.4 kW |
 | PV | 190 kWp, south, 12° → 186.6 MWh/year |
-| Battery | 241 kWh / 99 kW (BOLT-241), 90% charging efficiency, SoC 10–95% |
+| Battery | Boltainer BOLT-241: 241 kWh / 99 kW, 90% round-trip efficiency (loss applied on charging), SoC 10–95% |
 | Prices | ENTSO-E day-ahead NL 2023 |
-| Tariffs | transport €0.0226/kWh, monthly peak €3.57/kW, energy tax (energiebelasting) €0.03735/kWh |
+| Tariffs | transport €0.0226/kWh, monthly peak €3.57/kW, energy tax (energiebelasting) €0.03735/kWh (marginal bracket, 2026 rate) |
 
 ## Results (2023)
 
@@ -59,15 +60,19 @@ Payback period: not yet calculated (investment costs are not in the model yet).
 
 ## Limitations
 
+- **Dynamic (day-ahead) contract assumed:** the logical contract for arbitrage. Behind a fixed-price
+  contract the ~€6,600 arbitrage component does not apply (NET-7).
 - **Perfect foresight:** the LP result is an upper bound (TIME-2).
 - **No degradation cost:** battery wear is free in the model (BAT-3). Since wear scales mainly
   with energy throughput, this favours the LP most: it runs 487 full cycles/year versus 102 for
   the RBC. The LP savings are therefore optimistic on two counts: perfect foresight and free cycling.
 - **One price year, in-sample:** not tested whether other years turn out higher or lower (NET-4).
-- **Smoothed consumption profile:** an average of hundreds of buildings, so the value of peak reduction
+- **Smoothed consumption profile:** an average of many buildings, so the value of peak reduction
   is probably underestimated (DATA-7).
-- **Tariffs and battery specs not verified:** all euro amounts are indicative (DATA-9).
-- **Not modeled:** contracted transport capacity (GTV), lower export price (ARCH-5), and simultaneous
+- **Energy tax at the marginal rate:** the higher rates on the first 50,000 kWh are paid in every
+  scenario, so savings are unaffected, but absolute net costs are understated (NET-5).
+- **Tariffs and battery specs not verified:** all euro amounts are indicative (DATA-9, NET-8).
+- **Not modeled:** contracted transport capacity (GTV, NET-8), lower export price (ARCH-5), and simultaneous
   charging/discharging at negative prices is measured but not excluded (BAT-8, ≤ €270/year).
 
 ## Running
@@ -82,7 +87,9 @@ uv run main.py              # no battery, RBC, LP (A and B) → costs + plot (~4
 uv run pytest
 ```
 
-The Liander profile (`KO_KANTOOR_ONDERWIJS_clean_2023_semicolon.csv`) must be placed manually in `data/raw/`.
+The Liander load profile is not fetched automatically. Download the K&O profile for offices
+("K&O profielen", KO_KANTOOR_ONDERWIJS) from [Liander open data](https://www.liander.nl/over-ons/open-data)
+and save it as `data/raw/KO_KANTOOR_ONDERWIJS_clean_2023_semicolon.csv`.
 PVGIS and ENTSO-E data are fetched and cached on the first run.
 
 ## Next steps
