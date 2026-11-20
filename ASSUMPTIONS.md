@@ -64,6 +64,8 @@ check the matching comment in the code.
   eliminate than here with perfect foresight (TIME-2).
 
 **DATA-8 — Reference building, large-consumer scale**
+- Hypothetical reference building, not a real site. 4,500 m² office at
+  115 kWh/m²/year
 - 4,500 m² office at 115 kWh/m²/year (Dutch average for offices, range
   100–150) gives 517.5 MWh/year. The area is chosen so that the peak lands well
   above the large-consumer threshold (3x80A, ~55 kVA) instead of right at it.
@@ -85,28 +87,20 @@ check the matching comment in the code.
   availability are not verified. Manufacturer cycle life: ≥ 6,000 cycles,
   without stated test conditions (see BAT-3).
 
-**DATA-10 — PV sizing, export-aware**
-- 190 kWp instead of 25 kWp, same underlying ratio as the
-  original (undocumented) "annual consumption rule of thumb"
-  comment in PVConfig: 25 kWp / 67,850 kWh (old annual consumption) ≈ 0.368
-  kWp per MWh/year, applied to the new annual consumption (517,500 kWh) ->
-  ~190.6 kWp.
-  Deliberate choice between two strategies: (a) export-aware, ~33%
-  annual coverage (190 kWp, chosen) vs. (b) full annual consumption
-  coverage (~673 kWp, common residential rule of thumb: 1.3 kWp per 1,000 kWh
-  annual consumption). (b) requires ~2,605 m² of roof area (1,447 panels
-  at 465 Wp x 1.8 m²/panel), (a) ~736 m² — the latter fits
-  comfortably within a 4,500 m² building, the former is on the tight
-  side.
-  Reason for (a): for large consumers, export is structurally valued lower
-  than self-consumption (see ARCH-5) — an installation that
-  mainly targets export uses a large part of its kWp on the least
-  valuable part of the yield.
-  NOTE: this is a ratio-preserving extrapolation of an
-  originally unsubstantiated number (no notebook/calculation
-  found for the original 25 kWp), not an independently
-  verified rule of thumb. TODO if time permits: own justification (e.g.
-  roof area availability) instead of ratio preservation.
+**DATA-10 — PV sizing**
+- 190 kWp (~409 panels of 465 Wp, ~740 m² of panel area), producing
+  186.6 MWh/year: about 36% of annual consumption.
+- Two reasons for this size rather than covering the full annual consumption
+  (~670 kWp, ~2,600 m² of panels):
+  - Roof area: 190 kWp needs ~740 m² of panels, which fits on the roof of a
+    multi-storey 4,500 m² office. Full coverage (~2,600 m²) would need a roof
+    of more than half the total floor area, i.e. a building of at most one or
+    two floors.
+  - Export value: for large consumers, exported energy is worth less than
+    self-consumed energy (no net metering, no avoided transport and tax, see
+    ARCH-5). At 190 kWp, 78% of PV production is consumed on site even without
+    a battery; a larger system would mainly add low-value export.
+- Not optimized: the PV size was not optimized together with the battery.
 
 ---
 
