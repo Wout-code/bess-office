@@ -1,27 +1,23 @@
-"""Rule-based (heuristic) battery dispatch simulation.
+"""Rule-based battery dispatch (RBC): the baseline for the LP optimization.
 
-This is a deterministic, non-optimizing baseline: a simple set of
-priority rules decides charge/discharge behaviour each timestep. It exists
-to give a reference point to compare the LP optimization (optimize.py)
-against -- "how much better does actual optimization do than a
-sensible but non-optimal rule-based controller?"
+A deterministic, non-optimizing set of priority rules decides charge and
+discharge each timestep. It answers the question: how much better does real
+optimization (optimize.py) do than a sensible rule-based controller?
 
 Three rules, applied each timestep:
-1. PV charging: charge with PV surplus, limited by power rating and
-   remaining capacity.
-2. Peak shaving: discharge only when grid import would otherwise exceed
-   the peak threshold, and only down to that threshold (MKB capacity
-   tariffs are billed on the highest quarter-hour peak per month).
-   Below the threshold the battery does NOT discharge, so a PV deficit
-   on its own is covered from the grid, not from the battery.
-3. Grid charging (ARCH-3): whenever grid import stays below the peak
-   threshold, top the battery up from the grid with at most the
-   remaining headroom to the threshold, so it is full before the next
-   peak. Still price-agnostic (ARCH-1).
+1. PV charging: charge with PV surplus, limited by power and remaining
+   capacity.
+2. Peak shaving: discharge only when grid import would exceed the threshold,
+   and only down to that threshold (the monthly peak is billed on the highest
+   quarter-hour, NET-4). Below the threshold the battery does not discharge:
+   a small deficit is covered from the grid.
+3. Grid charging (ARCH-3): when import stays below the threshold, top up from
+   the grid with at most the remaining headroom, so the battery is full before
+   the next peak.
 
-Battery model: single capacity/power pair, round-trip efficiency
-applied on charge only (discharge assumed lossless on the way out --
-a common simplification), SoC bounded between configurable min/max.
+The rules never look at prices (ARCH-1) or ahead in time (TIME-1). Battery
+model as in ASSUMPTIONS.md: one power limit for both directions (BAT-1),
+losses on charging only (BAT-2), SoC between min and max.
 """
 
 import pandas as pd
@@ -34,10 +30,10 @@ def run_baseline_dispatch(
     load_kwh: pd.Series,
     battery: BatteryConfig,
     peak_threshold_kw: float,
-    timestep_hours: float = 1.0,
+    timestep_hours: float,
 ) -> pd.DataFrame:
     """
-    Simulate battery dispatch using simple priority rules.
+    Simulate battery dispatch with the three priority rules.
 
     Parameters
     ----------
@@ -45,24 +41,21 @@ def run_baseline_dispatch(
         PV generation in kWh per timestep, indexed by timestamp.
     load_kwh : pd.Series
         Building consumption in kWh per timestep, same index as pv_kwh.
-        Resample/align both series to the same index before calling
-        this (e.g. load_kwh.resample("1h").sum()).
     battery : BatteryConfig
         Battery capacity, power, efficiency and SoC bounds.
     peak_threshold_kw : float
-        Grid import above this level triggers battery discharge for
-        peak shaving, if the battery has capacity/power available.
+        Grid import above this level (kW) triggers discharge.
     timestep_hours : float
-        Length of each timestep in hours (e.g. 1.0 for hourly data,
-        0.25 for 15-minute data). Needed to convert the battery's
-        power rating (kW) into an energy limit (kWh) per timestep --
-        without this, power and energy units get silently mixed up.
+        Length of each timestep in hours, e.g. 0.25 for quarter-hours.
+        Converts the kW limits into kWh per timestep. Deliberately has no
+        default: with 1.0, kWh equals kW and unit errors stay invisible.
 
     Returns
     -------
     pd.DataFrame
         One row per timestep: pv_kwh, load_kwh, soc_kwh, charge_kwh,
-        discharge_kwh, grid_import_kwh, grid_export_kwh.
+        discharge_kwh, grid_import_kwh, grid_export_kwh (same columns as
+        run_lp_dispatch).
     """
     if not pv_kwh.index.equals(load_kwh.index):
         raise ValueError(
@@ -73,42 +66,36 @@ def run_baseline_dispatch(
     min_soc = battery.min_soc_fraction * battery.capacity_kwh
     max_soc = battery.max_soc_fraction * battery.capacity_kwh
     soc = battery.initial_soc_fraction * battery.capacity_kwh
-    charge_efficiency = battery.round_trip_efficiency
+    charge_efficiency = battery.round_trip_efficiency  # applied on charging only (BAT-2)
     max_energy_per_step = battery.power_kw * timestep_hours
 
     records = []
 
     for timestamp, pv in pv_kwh.items():
         load = load_kwh.loc[timestamp]
-        surplus = pv - load  # >0: PV excess, <0: deficit
+        surplus = pv - load  # > 0: PV surplus, < 0: deficit
 
         charge = 0.0
         discharge = 0.0
 
         if surplus > 0:
-            # Self-consumption: charge with PV surplus, limited by
-            # power rating, remaining capacity, and charging losses.
+            # Rule 1: charge with PV surplus.
             room_in_battery = (max_soc - soc) / charge_efficiency
             charge = min(surplus, max_energy_per_step, room_in_battery)
             soc += charge * charge_efficiency
 
         else:
             deficit = -surplus
-            # deficit is kWh per timestep, the threshold is kW -- convert
-            # explicitly (see CLAUDE.md, Units).
+            # Rule 2: deficit is kWh per timestep, the threshold is kW.
             if deficit / timestep_hours > peak_threshold_kw:
-                # Peak shaving: discharge to bring import down to the
-                # threshold, limited by power rating and available SoC.
                 shave_target = deficit - peak_threshold_kw * timestep_hours
                 available_energy = soc - min_soc
                 discharge = min(shave_target, max_energy_per_step, available_energy)
                 soc -= discharge
 
         if discharge == 0:
-            # Grid charging (ARCH-3): import is below the threshold -> top up
-            # from the grid with at most the remaining headroom to the threshold,
-            # limited by power (minus what is already being charged from PV) and
-            # max SoC. Same charging loss as for PV charging (BAT-2).
+            # Rule 3: top up from the grid up to the threshold, limited by the
+            # power left after PV charging and by max SoC.
             current_import = max(0.0, load + charge - pv)
             headroom = peak_threshold_kw * timestep_hours - current_import
             room_in_battery = (max_soc - soc) / charge_efficiency
@@ -116,8 +103,8 @@ def run_baseline_dispatch(
             charge += grid_charge
             soc += grid_charge * charge_efficiency
 
-        # Full energy balance: (load + charge) must be met by
-        # (pv + discharge + grid_import), with any leftover exported.
+        # Energy balance: load + charge is covered by pv + discharge + import;
+        # any remainder is exported.
         net_need = (load + charge) - (pv + discharge)
         grid_import = max(0.0, net_need)
         grid_export = max(0.0, -net_need)
@@ -142,7 +129,7 @@ def compute_dispatch_metrics(
     result: pd.DataFrame, peak_threshold_kw: float, timestep_hours: float
 ) -> dict:
     """
-    Summarize a dispatch result: peak import with/without battery and
+    Summarize a dispatch result: peak import with and without battery, and
     PV self-consumption.
 
     Parameters
@@ -150,10 +137,9 @@ def compute_dispatch_metrics(
     result : pd.DataFrame
         Output of run_baseline_dispatch or run_lp_dispatch (kWh per timestep).
     peak_threshold_kw : float
-        Threshold used for the run; only echoed back, descriptive.
+        Threshold used for the run; only echoed back.
     timestep_hours : float
-        Length of each timestep in hours, used to convert peak energy per
-        timestep (kWh) into power (kW).
+        Length of each timestep in hours, to convert kWh per timestep to kW.
 
     Returns
     -------
@@ -161,22 +147,20 @@ def compute_dispatch_metrics(
         Peaks in kW (``*_kw``), self-consumption in percent (``*_pct``).
     """
     naive_import = (result["load_kwh"] - result["pv_kwh"]).clip(lower=0)
-    # kWh per timestep -> kW
-    peak_no_battery = naive_import.max() / timestep_hours
-    peak_with_battery = result["grid_import_kwh"].max() / timestep_hours
+    peak_no_battery = naive_import.max() / timestep_hours  # kW
+    peak_with_battery = result["grid_import_kwh"].max() / timestep_hours  # kW
     peak_shaved = peak_no_battery - peak_with_battery
     peak_shaved_pct = 100 * peak_shaved / peak_no_battery if peak_no_battery > 0 else 0.0
 
+    # Self-consumption = share of PV not exported. Assumes all export is PV;
+    # if the battery itself exports (possible in the LP), this understates it.
     pv_total = result["pv_kwh"].sum()
-    pv_exported = result["grid_export_kwh"].sum()
-    pv_used_onsite = pv_total - pv_exported
+    pv_used_onsite = pv_total - result["grid_export_kwh"].sum()
     self_consumption_pct = 100 * pv_used_onsite / pv_total if pv_total > 0 else 0.0
 
-    # Self-consumption WITHOUT a battery: PV used directly on-site,
-    # i.e. min(pv, load) at each timestep -- the battery isn't involved.
+    # Without a battery, PV used on site is min(pv, load) per timestep.
     naive_pv_used_onsite = pd.concat([result["pv_kwh"], result["load_kwh"]], axis=1).min(axis=1).sum()
     self_consumption_no_battery_pct = 100 * naive_pv_used_onsite / pv_total if pv_total > 0 else 0.0
-    self_consumption_gain_pct = self_consumption_pct - self_consumption_no_battery_pct
 
     return {
         "peak_threshold_kw": peak_threshold_kw,
@@ -186,23 +170,18 @@ def compute_dispatch_metrics(
         "peak_shaved_pct": peak_shaved_pct,
         "self_consumption_pct": self_consumption_pct,
         "self_consumption_no_battery_pct": self_consumption_no_battery_pct,
-        "self_consumption_gain_pct": self_consumption_gain_pct,
+        "self_consumption_gain_pct": self_consumption_pct - self_consumption_no_battery_pct,
     }
 
 
 if __name__ == "__main__":
-    # Isolated logic test with synthetic, perfectly-aligned data.
-    # This checks the dispatch RULES, not real-world data integration
-    # (timezones, resampling, index alignment) -- that happens in main.py.
-    # Hourly data (timestep 1.0): kWh == kW, so unit errors are not
-    # visible here -- that is what the pytest tests with timestep 0.25 are for.
+    # Quick logic check on small synthetic hourly data. With timestep 1.0,
+    # kWh equals kW, so unit errors are not visible here: the pytest tests
+    # use 0.25 for that.
     import numpy as np
 
     hours = pd.date_range("2023-06-01", periods=24, freq="1h")
-    pv = pd.Series(
-        np.clip(5 * np.sin((hours.hour - 6) / 12 * np.pi), 0, None),
-        index=hours,
-    )
+    pv = pd.Series(np.clip(5 * np.sin((hours.hour - 6) / 12 * np.pi), 0, None), index=hours)
     load = pd.Series(
         [2, 2, 2, 2, 2, 3, 5, 6, 4, 3, 3, 3, 3, 3, 3, 4, 6, 7, 6, 4, 3, 2, 2, 2],
         index=hours,
@@ -210,8 +189,7 @@ if __name__ == "__main__":
 
     battery = BatteryConfig(capacity_kwh=10, power_kw=5)
     peak_threshold_kw = 4
-    result = run_baseline_dispatch(pv, load, battery, peak_threshold_kw=peak_threshold_kw)
-
+    result = run_baseline_dispatch(pv, load, battery, peak_threshold_kw=peak_threshold_kw, timestep_hours=1.0)
     print(result)
 
     metrics = compute_dispatch_metrics(result, peak_threshold_kw=peak_threshold_kw, timestep_hours=1.0)
