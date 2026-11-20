@@ -59,7 +59,7 @@ def compute_financial_metrics(
 
     # Monthly peak: kWh per timestep -> kW, highest per calendar month.
     peak_import_kw_per_step = result["grid_import_kwh"] / timestep_hours
-    monthly_peak_kw = peak_import_kw_per_step.groupby(result.index.to_period("M")).max()
+    monthly_peak_kw = peak_import_kw_per_step.groupby(result.index.tz_localize(None).to_period("M")).max()
     peak_cost = monthly_peak_kw.sum() * grid_tariff.monthly_peak_tariff_eur_per_kw
 
     return {

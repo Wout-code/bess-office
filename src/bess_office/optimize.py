@@ -113,7 +113,7 @@ def run_lp_dispatch(
     # are already tz-aware Europe/Amsterdam (see ASSUMPTIONS.md DATA-1), so this
     # follows local clock time, not UTC -- consistent with how the tariff is
     # billed in reality.
-    months = pd.Series(timestamps).dt.to_period("M").astype(str)
+    months = pd.Series(timestamps).dt.tz_localize(None).dt.to_period("M").astype(str)
     unique_months = sorted(months.unique())
 
     min_soc = battery.min_soc_fraction * battery.capacity_kwh
