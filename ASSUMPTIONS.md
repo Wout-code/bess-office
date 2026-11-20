@@ -119,10 +119,11 @@ Both models use the same battery model.
 - **BAT-2** — Losses only on charging: the full round-trip efficiency is
   applied when charging, discharging is lossless.
 - **BAT-3** — No degradation: capacity and efficiency stay constant over the
-  year, and cycling costs nothing in the LP objective.
+  year, and battery wear has no cost in the LP objective (charging losses and
+  grid costs of cycling are included).
   - Why it matters: the LP cycles far more than the RBC (equivalent full
     cycles per year, 2023: RBC 102, LP scenario A 487, LP scenario B 264), so
-    free cycling favours the LP. Its savings are optimistic on this count as
+    free wear favours the LP. Its savings are optimistic on this count as
     well as on perfect foresight (TIME-2).
   - What drives wear here: at low C-rates (this system: 99 kW / 241 kWh ≈
     0.41C), ageing is driven mainly by time, temperature and energy throughput,

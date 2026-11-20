@@ -3,21 +3,21 @@
 Same physical battery model and input format as dispatch_sim.py, but
 decides charge/discharge by solving a single linear program over the
 full horizon at once, instead of applying reactive priority rules.
-See ASSUMPTIONS.md (V2) for what changes vs. the rule-based baseline:
-grid charging is free (the solver decides), the monthly peaks are
-optimized internally instead of following a fixed threshold, costs sit
-inside the objective (ARCH-4), and the horizon is a perfect forecast
-(TIME-2) -- so the result is an upper bound on what a real controller
+Differences from the rule-based model (see ASSUMPTIONS.md): grid charging
+is free, the solver decides (ARCH-3); the monthly peaks are optimized
+per month instead of following one fixed threshold (NET-4); costs sit
+inside the objective (ARCH-4); and the horizon is a perfect forecast
+(TIME-2), so the result is an upper bound on what a real controller
 could achieve.
 
 The objective is the total annual cost in EUR, with five components:
-- energy: (import - export) x day-ahead price,
+- energy: (import - export) x day-ahead price (NET-7),
 - transport: tariff per kWh of grid import,
 - energy tax: tariff per kWh of grid import, no netting (NET-5),
 - storage tax: tariff per kWh charged into the battery, 0 by default;
   only non-zero in the hypothetical double-tax scenario (NET-6),
 - monthly peak: tariff per kW of the highest quarter-hour import in
-  each calendar month.
+  each calendar month (NET-4).
 All components are already in EUR, so this is a single-objective LP
 with a richer cost function, not a multi-objective optimization.
 
@@ -26,17 +26,15 @@ conda-forge coincbc`, or download a CBC binary) or HiGHS (`pip install
 highspy`, then SolverFactory("appsi_highs")). This file defaults to CBC.
 """
 
-# Open, not yet resolved in this file (see ASSUMPTIONS.md):
-# - BAT-7: asymmetric charge/discharge power not yet implemented, power_kw
-#   is still used for both directions.
-# - BAT-3: no degradation cost -- the solver sees cycling as free. This is
-#   also the reason for the negative-price loophole: without a cost on
-#   throughput, simultaneous charging/discharging at price < 0 can look
-#   physically nonsensical but LP-optimal.
+# Known simplifications in this file (see ASSUMPTIONS.md):
+# - BAT-1: symmetric power, power_kw is used for both directions.
+# - BAT-3: no degradation cost -- battery wear is free; the solver only weighs
+#   charging losses and grid costs when cycling.
 # - BAT-4: no minimum on/off time, the battery can switch every quarter-hour.
-# - GTV/annual-exceedance component (see config.py GridTariffConfig)
-#   is NOT modeled -- deliberate simplification, see there for
-#   details and the TODO to add this later.
+# - BAT-8: simultaneous charging/discharging is not excluded; it happens only
+#   at negative prices and costs ~3% of the savings, so it is accepted.
+# - NET-8: the GTV/annual-exceedance component is not modeled, only the
+#   monthly peak.
 
 import pandas as pd
 import pyomo.environ as pyo
