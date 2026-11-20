@@ -8,7 +8,7 @@ large-consumer grid connection (grootverbruik). At quarter-hour resolution over 
 
 - **no battery**: the reference;
 - **RBC** (rule-based control): peak shaving with grid charging, threshold chosen for the lowest annual cost;
-- **LP**: linear optimization (Pyomo + CBC) that minimizes all cost components simultaneously.
+- **LP**: linear optimization (Pyomo + HiGHS) that minimizes all cost components simultaneously.
 
 The inputs are public data: PVGIS (simulated PV), ENTSO-E (actual day-ahead prices NL) and the Liander
 standard profile for offices (consumption). Every assumption has an ID in [`ASSUMPTIONS.md`](ASSUMPTIONS.md).
@@ -38,7 +38,7 @@ hypothetical energy tax on every kWh that goes into the battery (NET-6).
 | **Savings A** | – | **€1,066** | **€8,264** |
 | **Savings B** | – | **€191** | **€5,222** |
 | Annual peak import (A) | 96.5 kW | 96.5 kW | 86.8 kW |
-| Full cycles/year (A) | – | 102 | 487 |
+| Full cycles/year (A) | – | 102 | 486 |
 
 The LP knows the entire year in advance: **€8,264 is a theoretical upper bound**, not an achievable saving.
 Payback period: not yet calculated (investment costs are not in the model yet).
@@ -64,7 +64,7 @@ Payback period: not yet calculated (investment costs are not in the model yet).
   contract the ~€6,600 arbitrage component does not apply (NET-7).
 - **Perfect foresight:** the LP result is an upper bound (TIME-2).
 - **No degradation cost:** battery wear is free in the model (BAT-3). Since wear scales mainly
-  with energy throughput, this favours the LP most: it runs 487 full cycles/year versus 102 for
+  with energy throughput, this favours the LP most: it runs 486 full cycles/year versus 102 for
   the RBC. The LP savings are therefore optimistic on two counts: perfect foresight and free cycling.
 - **One price year, in-sample:** not tested whether other years turn out higher or lower (NET-4).
 - **Smoothed consumption profile:** an average of many buildings, so the value of peak reduction
@@ -77,8 +77,8 @@ Payback period: not yet calculated (investment costs are not in the model yet).
 
 ## Running
 
-Requirements: [uv](https://docs.astral.sh/uv/), Python ≥ 3.12 and the CBC solver
-(`apt install coinor-cbc` or `conda install -c conda-forge coincbc`).
+Requirements: [uv](https://docs.astral.sh/uv/) and Python ≥ 3.12. All dependencies, including the
+HiGHS solver, are installed by `uv sync`.
 
 ```bash
 uv sync

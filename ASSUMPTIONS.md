@@ -122,7 +122,7 @@ Both models use the same battery model.
   year, and battery wear has no cost in the LP objective (charging losses and
   grid costs of cycling are included).
   - Why it matters: the LP cycles far more than the RBC (equivalent full
-    cycles per year, 2023: RBC 102, LP scenario A 487, LP scenario B 264), so
+    cycles per year, 2023: RBC 102, LP scenario A 486, LP scenario B 264), so
     free wear favours the LP. Its savings are optimistic on this count as
     well as on perfect foresight (TIME-2).
   - What drives wear here: at low C-rates (this system: 99 kW / 241 kWh ≈
@@ -132,7 +132,7 @@ Both models use the same battery model.
     depth-of-discharge cost.
   - Open question: how large that cost should be depends on how calendar and
     cycle ageing combine. If the battery is replaced at the end of its calendar
-    life anyway, extra cycles cost little: 487 cycles per year still reaches
+    life anyway, extra cycles cost little: 486 cycles per year still reaches
     ≥ 6,000 cycles (DATA-9) only after ~12 years. If both add up, every cycle
     shortens the battery's life and the cost per kWh is substantial.
   - Not yet implemented; planned as a sensitivity analysis over a range of
@@ -232,7 +232,7 @@ Both models are costed with the same formula (`compute_financial_metrics` in
   - Why it happens: at negative prices, wasting energy through charging losses
     earns money, so charging and discharging at the same time is optimal for
     the LP.
-  - Checked (2023 data), scenario A: 399 of 35,032 quarter-hours, all at a
+  - Checked (2023 data), scenario A: 398 of 35,032 quarter-hours, all at a
     negative price (1,256 quarter-hours < 0). 546 kWh is lost, at most
     ~€270/year even at the lowest price (−500 EUR/MWh): ~3% of the LP savings.
     Scenario B: 16 quarter-hours, also all at a negative price.

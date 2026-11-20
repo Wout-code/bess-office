@@ -21,9 +21,7 @@ The objective is the total annual cost in EUR, with five components:
 All components are already in EUR, so this is a single-objective LP
 with a richer cost function, not a multi-objective optimization.
 
-Requires a solver Pyomo can call, e.g. CBC (`conda install -c
-conda-forge coincbc`, or download a CBC binary) or HiGHS (`pip install
-highspy`, then SolverFactory("appsi_highs")). This file defaults to CBC.
+Solver: HiGHS via highspy, installed by `uv sync` like the other dependencies.
 """
 
 # Known simplifications in this file (see ASSUMPTIONS.md):
@@ -180,7 +178,7 @@ def run_lp_dispatch(
 
     model.objective = pyo.Objective(rule=objective_rule, sense=pyo.minimize)
 
-    solver = pyo.SolverFactory("cbc")
+    solver = pyo.SolverFactory("appsi_highs")
     solver_result = solver.solve(model, tee=False)
 
     if solver_result.solver.termination_condition != pyo.TerminationCondition.optimal:
