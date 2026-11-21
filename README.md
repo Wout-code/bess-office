@@ -11,7 +11,7 @@ large-consumer grid connection (grootverbruik). At quarter-hour resolution over 
 - **LP**: linear optimization (Pyomo + HiGHS) that minimizes all cost components simultaneously.
 
 The inputs are public data: PVGIS (simulated PV), ENTSO-E (actual day-ahead prices NL) and the Liander
-standard profile for offices (consumption). Every assumption has an ID in [`ASSUMPTIONS.md`](ASSUMPTIONS.md).
+standard profile for large-consumer offices (consumption). Every assumption has an ID in [`ASSUMPTIONS.md`](ASSUMPTIONS.md).
 
 ## Reference case
 
@@ -82,7 +82,7 @@ downloads or API keys:
 
 | File | Source |
 |---|---|
-| `KO_KANTOOR_ONDERWIJS_clean_2023_semicolon.csv` | [Liander open data](https://www.liander.nl/over-ons/open-data), K&O standard profile for offices |
+| `KO_KANTOOR_ONDERWIJS_clean_2023_semicolon.csv` | [Liander open data](https://www.liander.nl/over-ons/open-data), dataset "Verbruiksprofielen grootverbruikaansluitingen elektriciteit": K&O standard profile for offices |
 | `pvgis_*.csv` | [PVGIS](https://joint-research-centre.ec.europa.eu/pvgis-online-tool_en) (EU JRC), simulated PV for the reference system |
 | `entsoe_prices_NL_*.csv` | [ENTSO-E Transparency Platform](https://transparency.entsoe.eu/), day-ahead prices NL |
 
@@ -111,6 +111,8 @@ The key open question: how much of the €8,264 remains without perfect knowledg
   and how much of the savings remain once wear is priced in.
 - **GTV and congestion:** the value of a smaller grid connection.
 - **More years:** other price years, RBC threshold out-of-sample.
+- **Real building data:** replace the averaged standard profile with the measured consumption of a
+  single building, to test whether the value of peak reduction is underestimated (DATA-7).
 
 ## How this project was built
 
