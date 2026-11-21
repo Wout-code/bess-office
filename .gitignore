@@ -9,26 +9,30 @@ wheels/
 # Virtual environments
 .venv
 
-
 # Personal notes, not for the repo
 z.Cheatsheet.md
 z.TODO.md
-0.2-load-exploration.md
 z.Roadmap.md
-dispatch_sim.md
-
 z.Eindproduct.md
-# data
-data/
 z.NASLAGWERK.md
+0.2-load-exploration.md
+dispatch_sim.md
 CONTEXT.md
-
-# py files
-dump_context.py
-
 CLAUDE.md
 
 # Internal planning/notes, not public
 ROADMAP.md
 insights.md
 scope.md
+
+# Context dump script and its output
+dump_context.py
+context_dump.txt
+
+# Data: only the input files for the reference case are committed
+data/*
+!data/raw/
+data/raw/*
+!data/raw/KO_KANTOOR_ONDERWIJS_clean_2023_semicolon.csv
+!data/raw/pvgis_*.csv
+!data/raw/entsoe_prices_NL_*.csv
