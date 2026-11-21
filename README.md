@@ -75,6 +75,21 @@ Payback period: not yet calculated (investment costs are not in the model yet).
 - **Not modeled:** contracted transport capacity (GTV, NET-8), lower export price (ARCH-5), and simultaneous
   charging/discharging at negative prices is measured but not excluded (BAT-8, ≤ €270/year).
 
+## Data
+
+The input data for the 2023 reference case is included in `data/raw/`, so the model runs without
+downloads or API keys:
+
+| File | Source |
+|---|---|
+| `KO_KANTOOR_ONDERWIJS_clean_2023_semicolon.csv` | [Liander open data](https://www.liander.nl/over-ons/open-data), K&O standard profile for offices |
+| `pvgis_*.csv` | [PVGIS](https://joint-research-centre.ec.europa.eu/pvgis-online-tool_en) (EU JRC), simulated PV for the reference system |
+| `entsoe_prices_NL_*.csv` | [ENTSO-E Transparency Platform](https://transparency.entsoe.eu/), day-ahead prices NL |
+
+For other PV configurations, PVGIS is queried automatically (no key needed). Other price years
+require a free ENTSO-E API key: register on the Transparency Platform, request API access by email
+to the Transparency helpdesk, and set it as `ENTSOE_API_KEY`.
+
 ## Running
 
 Requirements: [uv](https://docs.astral.sh/uv/) and Python ≥ 3.12. All dependencies, including the
@@ -82,15 +97,9 @@ HiGHS solver, are installed by `uv sync`.
 
 ```bash
 uv sync
-export ENTSOE_API_KEY=...   # only needed if the prices are not cached yet
-uv run main.py              # no battery, RBC, LP (A and B) → costs + plot (~40 s)
+uv run main.py   # no battery, RBC, LP (A and B) → costs + plot (~40 s)
 uv run pytest
 ```
-
-The Liander load profile is not fetched automatically. Download the K&O profile for offices
-("K&O profielen", KO_KANTOOR_ONDERWIJS) from [Liander open data](https://www.liander.nl/over-ons/open-data)
-and save it as `data/raw/KO_KANTOOR_ONDERWIJS_clean_2023_semicolon.csv`.
-PVGIS and ENTSO-E data are fetched and cached on the first run.
 
 ## Next steps
 
