@@ -149,9 +149,11 @@ HiGHS solver, are installed by `uv sync`.
 
 ```bash
 uv sync
-uv run main.py   # no battery, RBC, LP + degradation sensitivity → costs + plots (about 2 minutes)
+uv run main.py   # no battery, RBC, LP + degradation sensitivity → costs + plots
 uv run pytest
 ```
+
+`main.py` takes about 2 minutes. The plots open in a window; close them to let the script finish.
 
 ## Next steps
 
