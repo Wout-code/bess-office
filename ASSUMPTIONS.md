@@ -126,8 +126,7 @@ Both models use the same battery model.
   cycling.
   - Why it matters: the LP cycles far more than the RBC (equivalent full
     cycles per year, 2023, base case: RBC 32, LP 268). With free wear the gap
-    is RBC 102, LP 486, and the LP savings would be optimistic on this count as
-    well as on perfect foresight (TIME-2).
+    is RBC 102, LP 486, and the LP savings would be to optimistic.
   - What drives wear here: at low C-rates (this system: 99 kW / 241 kWh ≈
     0.41C), ageing is driven mainly by time, temperature and energy throughput,
     and hardly by depth of discharge (Wang et al., 2011, on LFP cells). The
@@ -219,6 +218,12 @@ Both models are costed with the same formula (`compute_financial_metrics` in
   it, up to 136 kW, falls in this category.
   - Only the monthly peak is modeled. The GTV is treated as a fixed cost;
     exceeding it, which raises the GTV for the whole year, is not modeled.
+  - Because the GTV is not modeled, savings from a lower annual peak are
+    missing. This matters most for the RBC: in the base case it lowers the
+    annual peak from 96.5 to 72 kW (LP: 84.6 kW). At €3.74/kW/month, a
+    contracted capacity lowered by that much would be worth roughly
+    €1,200/year (RBC) and €700/year (LP), more than the RBC's modeled savings.
+    In practice a safety margin would be kept.
   - The fixed charges (transport standing charge €36.75/month, connection
     charge €22.09/month) are paid in every scenario, so they do not change the
     savings; absolute net costs are understated by ~€700/year.
