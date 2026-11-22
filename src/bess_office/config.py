@@ -71,10 +71,10 @@ class GridTariffConfig:
     Liander charges two capacity components: an annual tariff on the
     contracted capacity (GTV, "kW contract") and a monthly tariff on the
     highest measured peak ("kW max. mnd"). Only the monthly peak is modeled;
-    the GTV is treated as a fixed cost (NET-8).
+    the GTV is treated as a fixed cost (NET-8). Fixed charges (standing charge,
+    connection charge) are not modeled: they are paid in every scenario.
 
-    Transport and capacity figures are not yet verified against the tariff
-    sheet (NET-8).
+    Figures verified against the 2026 tariff sheet (NET-8).
     """
     # EUR per kWh imported, independent of the peak.
     transport_tariff_eur_per_kwh: float | None = 0.0226

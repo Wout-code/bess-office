@@ -47,7 +47,7 @@ check the matching comment in the code.
   building-integrated; panels on a low frame on a flat roof are in between,
   with less airflow than free-standing, so PV yield may be slightly
   overestimated.
-  
+
 **DATA-6 — Load data (Liander K&O profile)**
 - Liander's own standard profile for offices, built from telemetry of large
   consumers and used by Liander to estimate new large-consumer connections.
@@ -189,10 +189,16 @@ Both models are costed with the same formula (`compute_financial_metrics` in
   of the owner's decision but not of the battery's value, and (c) batteries
   installed only for peak shaving or congestion behind a fixed-price contract:
   there the ~€6,600 arbitrage component of the LP savings does not apply.
-- **NET-8** — Only the monthly peak component of the grid tariff is modeled.
-  The annual contracted capacity (GTV, "kW contract") is treated as a fixed
-  cost; exceeding it, which raises the GTV for the whole year, is not modeled.
-  Tariff figures are estimates, not verified against the Liander tariff sheet.
+- **NET-8** — Grid tariffs: Liander 2026, sub-market MS/LS > 50 up to and
+  including 136 kW, verified against the tariff sheet: transport €0.0226/kWh,
+  monthly peak €3.57/kW/month, contracted capacity (GTV) €3.74/kW/month. This
+  sub-market follows from the 99.4 kW peak: any contracted capacity that covers
+  it, up to 136 kW, falls in this category.
+  - Only the monthly peak is modeled. The GTV is treated as a fixed cost;
+    exceeding it, which raises the GTV for the whole year, is not modeled.
+  - The fixed charges (transport standing charge €36.75/month, connection
+    charge €22.09/month) are paid in every scenario, so they do not change the
+    savings; absolute net costs are understated by ~€700/year.
 - **ARCH-5** — Symmetric import and export prices: export is valued at the
   full day-ahead price. In reality, export misses the avoided transport tariff
   and energy tax, and large consumers are usually paid below the import price

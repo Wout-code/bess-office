@@ -18,7 +18,7 @@ COST_COMPONENTS = [
     ("transport_cost_eur", "Transport", "#1baf7a"),
     ("peak_cost_eur", "Monthly peak", "#eda100"),
 ]
-EXPORT_COMPONENT = ("export_revenue_eur", "Export (deduction)", "#e87ba4")
+EXPORT_COMPONENT = ("export_revenue_eur", "Export revenue (subtracted)", "#e87ba4")
 
 
 def _eur(value: float, _pos=None) -> str:
@@ -97,7 +97,7 @@ def plot_cost_breakdown(financials: dict[str, dict], path: Path, show: bool = Tr
 
     ax.set_ylabel("EUR per year", color=TEXT_SECONDARY)
     ax.set_title(
-        "Annual cost per component (2023 data, tariffs indicative)",
+        "Annual cost per component, scenario A\n(2023 prices and PV, 2026 tariffs)",
         color=TEXT_PRIMARY,
         loc="left",
         fontsize=12,
