@@ -73,7 +73,7 @@ scan (lowest annual net cost, including wear at that cost).
 
 ![Annual cost per component](results/cost_breakdown.png)
 
-Both charts show the base case; battery wear is a separate cost component.
+Battery wear (€0.04/kWh discharged) is counted as a separate cost component; see the sensitivity analysis for other values.
 
 ## Findings
 
