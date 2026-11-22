@@ -38,7 +38,7 @@ def compute_financial_metrics(
     with one identical formula, so the comparison is fair. Same components as
     the LP objective:
 
-    - import cost and export revenue at the day-ahead price (NET-7, ARCH-5),
+    - import cost and export revenue at the day-ahead price (NET-7, NET-9),
     - transport tariff per kWh imported,
     - energy tax per kWh imported, no netting (NET-5),
     - storage tax per kWh charged into the battery (NET-6, 0 in scenario A),

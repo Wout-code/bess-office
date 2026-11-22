@@ -21,7 +21,7 @@ class PVConfig:
     longitude: float = 4.36
     # 190 kWp, ~36% of annual consumption (DATA-10): fits on the roof and keeps
     # most PV consumed on site, since export is valued lower than
-    # self-consumption for large consumers (ARCH-5).
+    # self-consumption for large consumers (NET-9).
     peak_power_kw: float = 190.0
     tilt: float = 12.0
     # 180 = south in pvlib's north-zero convention (north=0, east=90,

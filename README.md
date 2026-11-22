@@ -72,7 +72,7 @@ Payback period: not yet calculated (investment costs are not in the model yet).
 - **Energy tax at the marginal rate:** the higher rates on the first 50,000 kWh are paid in every
   scenario, so savings are unaffected, but absolute net costs are understated (NET-5).
 - **Tariffs and battery specs not verified:** all euro amounts are indicative (DATA-9, NET-8).
-- **Not modeled:** contracted transport capacity (GTV, NET-8), lower export price (ARCH-5), and simultaneous
+- **Not modeled:** contracted transport capacity (GTV, NET-8), lower export price (NET-9), and simultaneous
   charging/discharging at negative prices is measured but not excluded (BAT-8, ≤ €270/year).
 
 ## Data

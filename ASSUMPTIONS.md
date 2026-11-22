@@ -12,8 +12,8 @@ the next free number in its category. When an assumption is corrected, the
 correction gets a new ID that refers back to the old one.
 
 This file shows only what currently applies. Replaced assumptions are removed,
-so gaps in the numbering (such as DATA-3, DATA-4, NET-1, ARCH-2 and BAT-7) are
-expected.
+so gaps in the numbering (such as DATA-3, DATA-4, NET-1, ARCH-2, ARCH-5 and
+BAT-7) are expected.
 
 Code comments refer to these IDs, so when you change an assumption here, also
 check the matching comment in the code.
@@ -106,7 +106,7 @@ check the matching comment in the code.
     two floors.
   - Export value: for large consumers, exported energy is worth less than
     self-consumed energy (no net metering, no avoided transport and tax, see
-    ARCH-5). At 190 kWp, 78% of PV production is consumed on site even without
+    NET-9). At 190 kWp, 78% of PV production is consumed on site even without
     a battery; a larger system would mainly add low-value export.
 - Not optimized: the PV size was not optimized together with the battery.
 
@@ -199,11 +199,12 @@ Both models are costed with the same formula (`compute_financial_metrics` in
   - The fixed charges (transport standing charge €36.75/month, connection
     charge €22.09/month) are paid in every scenario, so they do not change the
     savings; absolute net costs are understated by ~€700/year.
-- **ARCH-5** — Symmetric import and export prices: export is valued at the
-  full day-ahead price. In reality, export misses the avoided transport tariff
-  and energy tax, and large consumers are usually paid below the import price
-  for feed-in (no net metering). This overvalues export, and therefore larger
-  PV systems (DATA-10). A correction needs a real feed-in contract figure.
+- **NET-9** — Export at the full day-ahead price: every exported kWh earns the
+  day-ahead price of that moment. Transport and energy tax are (correctly) not
+  refunded on export. In reality, large consumers are usually paid below the
+  day-ahead price for feed-in (supplier deduction, no net metering). This
+  overvalues export, and therefore larger PV systems (DATA-10) and any battery
+  arbitrage via export. A correction needs a real feed-in contract figure.
 
 ---
 
