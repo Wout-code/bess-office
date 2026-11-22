@@ -23,7 +23,8 @@ from bess_office.fetch_load import derive_peak_kwh_per_quarter, get_relative_pro
 from bess_office.fetch_prices import get_day_ahead_prices
 from bess_office.fetch_pv import get_pv_profile
 from bess_office.optimize import run_lp_dispatch
-from bess_office.plotting import plot_cost_breakdown
+from bess_office.plotting import plot_cost_breakdown, plot_savings_breakdown
+import matplotlib.pyplot as plt
 
 RESULTS_DIR = Path(__file__).parent / "results"
 
@@ -303,7 +304,7 @@ def main() -> None:
     )
     print()
 
-    # --- Plot: annual cost per component, scenario A ---
+    # --- Plots: cost per component and savings per component, scenario A ---
     plot_path = plot_cost_breakdown(
         {
             "No battery": no_battery_financials,
@@ -312,7 +313,13 @@ def main() -> None:
         },
         RESULTS_DIR / "cost_breakdown.png",
     )
-    print(f"Plot saved: {plot_path}")
+    savings_path = plot_savings_breakdown(
+        no_battery_financials,
+        {f"RBC ({rbc_threshold_kw:.0f} kW)": rbc_financials, "LP": lp_financials},
+        RESULTS_DIR / "savings_breakdown.png",
+    )
+    print(f"Plots saved: {plot_path}, {savings_path}")
+    plt.show()  # opens both figures; the script ends when they are closed
 
 
 if __name__ == "__main__":

@@ -43,6 +43,8 @@ hypothetical energy tax on every kWh that goes into the battery (NET-6).
 The LP knows the entire year in advance: **€8,264 is a theoretical upper bound**, not an achievable saving.
 Payback period: not yet calculated (investment costs are not in the model yet).
 
+![Savings per component versus no battery](results/savings_breakdown.png)
+
 ![Annual cost per component](results/cost_breakdown.png)
 
 ## Findings
@@ -71,7 +73,8 @@ Payback period: not yet calculated (investment costs are not in the model yet).
   is probably underestimated (DATA-7).
 - **Energy tax at the marginal rate:** the higher rates on the first 50,000 kWh are paid in every
   scenario, so savings are unaffected, but absolute net costs are understated (NET-5).
-- **Tariffs and battery specs not verified:** all euro amounts are indicative (DATA-9, NET-8).
+- **Battery specs not verified:** efficiency and SoC range are typical LFP values (DATA-9). Grid
+  tariffs are verified against the Liander 2026 tariff sheet (NET-8).
 - **Not modeled:** contracted transport capacity (GTV, NET-8), lower export price (NET-9), and simultaneous
   charging/discharging at negative prices is measured but not excluded (BAT-8, ≤ €270/year).
 
@@ -97,7 +100,7 @@ HiGHS solver, are installed by `uv sync`.
 
 ```bash
 uv sync
-uv run main.py   # no battery, RBC, LP (A and B) → costs + plot (~40 s)
+uv run main.py   # no battery, RBC, LP (A and B) → costs + plots (~40 s)
 uv run pytest
 ```
 

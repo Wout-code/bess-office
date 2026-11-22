@@ -213,7 +213,7 @@ Both models are costed with the same formula (`compute_financial_metrics` in
 
 - **TIME-1** — No look-ahead: purely reactive, each quarter-hour on its own.
   Inherent to a rule, not something to be fixed.
-- **ARCH-1** — No prices in the model: a physical energy-flow simulation; the
+- **ARCH-1** — No prices in the model: a physical energy-flow simu  lation; the
   costs are calculated afterwards in `main.py`.
 - **ARCH-3** — Grid charging allowed, corrects ARCH-2. Rule: as long as import
   stays below the threshold, charge from the grid with at most the remaining
