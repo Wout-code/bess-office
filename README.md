@@ -4,6 +4,8 @@
 €461/year, while optimization saves up to €5,304 (upper bound), mostly by shifting energy to
 cheaper hours.**
 
+An independent side project, not part of my study program.
+
 An open, transparent model for operating a battery (BESS) in an SME office building with a
 large-consumer grid connection (grootverbruik). At quarter-hour resolution over a full year, it compares:
 
