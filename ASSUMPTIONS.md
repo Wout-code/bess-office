@@ -248,10 +248,10 @@ Both models are costed with the same formula (`compute_financial_metrics` in
     Scenario B: 16 quarter-hours, also all at a negative price (checked with
     scripts/check_bat8.py).
   - The effect is small and reported, so the model stays an LP.
-- **BAT-9** — End SoC ≥ initial SoC at the end of the year. Without this, the
+- *-9** — End SoC ≥ initial SoC at the end of the year. Without this, the
   LP drains the battery for free at the end and counts that energy as savings.
   The RBC has no such condition (2023: ends at 208.8 kWh vs. 120.5 kWh at the
-  start, a small disadvantage for the RBC).
+  start, a small disadvantage for the RBC).*BAT
 
 ---
 
