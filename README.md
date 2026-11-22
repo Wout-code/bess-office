@@ -33,7 +33,9 @@ typical LFP values (DATA-9).
 ## Results (2023)
 
 Net annual cost = energy + transport + energy tax + monthly peak + battery wear − export. Battery
-wear is priced at €0.04 per kWh discharged (BAT-10); the sensitivity below varies that value.
+wear is priced at €0.04 per kWh discharged (BAT-10). Fixed charges, the higher tax brackets and
+VAT are the same in every scenario and left out (NET-5, NET-8), so absolute costs are understated
+but the savings are not.
 
 | | No battery | RBC (72 kW) | LP |
 |---|---:|---:|---:|
@@ -46,14 +48,19 @@ wear is priced at €0.04 per kWh discharged (BAT-10); the sensitivity below var
 The LP knows the entire year in advance: **€5,304 is a theoretical upper bound**, not an achievable saving.
 Payback period: not yet calculated (investment costs are not in the model yet).
 
-### Sensitivity: degradation cost (BAT-10)
+### Sensitivity analysis: degradation cost (BAT-10)
 
-Battery wear priced per kWh discharged, applied with the same formula to RBC and LP. Base case
-€0.04/kWh = replaceable hardware (~€200/kWh × 241 kWh) / (6,000 cycles × 204.85 usable kWh).
-For every value the LP is re-solved and the RBC threshold is re-chosen (same scan, lowest annual
-net cost including wear). €0 means wear is free (calendar ageing dominates): the upper bound on
-the savings. €0.06/kWh is a stress case, e.g. a cycle life of 4,000 instead of 6,000 cycles
-(~€0.059/kWh).
+Battery wear is priced per kWh discharged, with the same formula for RBC and LP. A cost per kWh fits because, at this battery's low charging rate, LFP ageing is driven mainly by time, temperature and throughput rather than depth of discharge (Wang et al., 2011; BAT-3). The base case of
+€0.04/kWh is the cost of replacing the battery hardware (~€200/kWh × 241 kWh = ~€48,200), spread
+over all the energy it can deliver in its life (6,000 cycles × 204.85 usable kWh). The table
+below repeats the run for other wear costs:
+
+- €0/kWh: wear is free (calendar ageing dominates), the upper bound on the savings;
+- €0.04/kWh: base case;
+- €0.06/kWh: stress case, e.g. a cycle life of 4,000 instead of 6,000 cycles.
+
+For each wear cost the LP is solved again, and the RBC threshold is chosen again with the same
+scan (lowest annual net cost, including wear at that cost).
 
 | Degradation cost | RBC threshold | Savings RBC | Savings LP | LP cycles/year |
 |---:|---:|---:|---:|---:|
