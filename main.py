@@ -319,7 +319,8 @@ def main() -> None:
         )
     print()
 
-    # --- Plots: cost per component and savings per component, base case incl. battery wear (BAT-10) ---
+    # --- Plots: cost per component and savings per component, at the configured
+    # degradation cost (BAT-10); the value is passed on so it appears in the titles.
     plot_path = plot_cost_breakdown(
         {
             "No battery": no_battery_financials,
@@ -327,11 +328,13 @@ def main() -> None:
             "LP": lp_financials,
         },
         RESULTS_DIR / "cost_breakdown.png",
+        wear_cost_eur_per_kwh=CONFIG.battery.degradation_cost_eur_per_kwh,
     )
     savings_path = plot_savings_breakdown(
         no_battery_financials,
         {f"RBC ({rbc_threshold_kw:.0f} kW)": rbc_financials, "LP": lp_financials},
         RESULTS_DIR / "savings_breakdown.png",
+        wear_cost_eur_per_kwh=CONFIG.battery.degradation_cost_eur_per_kwh,
     )
     print(f"Plots saved: {plot_path}, {savings_path}")
     plt.show()  # opens both figures; the script ends when they are closed

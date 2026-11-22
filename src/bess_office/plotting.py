@@ -69,7 +69,9 @@ def _save(fig, path: Path, show: bool, layout: bool = True) -> Path:
     return path
 
 
-def plot_cost_breakdown(financials: dict[str, dict], path: Path, show: bool = True) -> Path:
+def plot_cost_breakdown(
+    financials: dict[str, dict], path: Path, wear_cost_eur_per_kwh: float, show: bool = True
+) -> Path:
     """
     Stacked bar chart of annual cost per component, one bar per scenario.
 
@@ -80,6 +82,8 @@ def plot_cost_breakdown(financials: dict[str, dict], path: Path, show: bool = Tr
         Insertion order is the bar order.
     path : Path
         Output PNG path; parent directories are created if needed.
+    wear_cost_eur_per_kwh : float
+        Battery wear cost used for these results, shown in the title (BAT-10).
     show : bool
         If True, keep the figure open so main.py can show it with plt.show();
         otherwise close it after saving.
@@ -132,7 +136,8 @@ def plot_cost_breakdown(financials: dict[str, dict], path: Path, show: bool = Tr
 
     ax.set_ylabel("EUR per year", color=TEXT_SECONDARY)
     ax.set_title(
-        "Annual cost per component, base case\n(incl. battery wear; 2023 prices and PV, 2026 tariffs)",
+        f"Annual cost per component\n(battery wear €{wear_cost_eur_per_kwh:.2f}/kWh discharged; "
+        "2023 prices and PV, 2026 tariffs)",
         color=TEXT_PRIMARY,
         loc="left",
         fontsize=12,
@@ -154,7 +159,11 @@ def plot_cost_breakdown(financials: dict[str, dict], path: Path, show: bool = Tr
 
 
 def plot_savings_breakdown(
-    reference: dict, scenarios: dict[str, dict], path: Path, show: bool = True
+    reference: dict,
+    scenarios: dict[str, dict],
+    path: Path,
+    wear_cost_eur_per_kwh: float,
+    show: bool = True,
 ) -> Path:
     """
     Grouped bar chart of the annual saving per cost component versus a
@@ -169,6 +178,8 @@ def plot_savings_breakdown(
         Insertion order is the bar order within each group.
     path : Path
         Output PNG path; parent directories are created if needed.
+    wear_cost_eur_per_kwh : float
+        Battery wear cost used for these results, shown in the title (BAT-10).
     show : bool
         If True, keep the figure open so main.py can show it with plt.show();
         otherwise close it after saving.
@@ -186,7 +197,7 @@ def plot_savings_breakdown(
     width = 0.8 / n
     x = range(len(SAVINGS_COMPONENTS))
 
-    fig, ax = plt.subplots(figsize=(8, 5.5), facecolor=SURFACE)
+    fig, ax = plt.subplots(figsize=(9, 5.5), facecolor=SURFACE)  # wide enough that labels of adjacent bars don't overlap
     ax.set_facecolor(SURFACE)
 
     for j, (label, colour) in enumerate(zip(labels, SCENARIO_COLOURS)):
@@ -204,6 +215,8 @@ def plot_savings_breakdown(
             label=f"{label}: total €{total:,.0f}/year",
         )
         for bar, value in zip(bars, savings):
+            if round(value) == 0:
+                continue  # a "€0" label on an invisible bar only adds noise
             ax.annotate(
                 _bar_label(value),
                 xy=(bar.get_x() + bar.get_width() / 2, value),
@@ -211,7 +224,7 @@ def plot_savings_breakdown(
                 textcoords="offset points",
                 ha="center",
                 va="bottom" if value >= 0 else "top",
-                fontsize=9,
+                fontsize=8.5,
                 color=TEXT_PRIMARY,
             )
 
@@ -221,7 +234,8 @@ def plot_savings_breakdown(
     ax.set_ylabel("Change vs. no battery, EUR per year\n(+ saving, − extra cost or lost revenue)",
                   color=TEXT_SECONDARY)
     ax.set_title(
-        "Where the savings come from, base case\n(battery wear counted as a cost; 2023 prices and PV, 2026 tariffs)",
+        f"Where the savings come from\n(battery wear €{wear_cost_eur_per_kwh:.2f}/kWh discharged; "
+        "2023 prices and PV, 2026 tariffs)",
         color=TEXT_PRIMARY,
         loc="left",
         fontsize=12,
