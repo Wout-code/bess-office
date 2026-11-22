@@ -286,10 +286,13 @@ Both models are costed with the same formula (`compute_financial_metrics` in
     quarter-hours, also all at a negative price, 546 kWh lost, at most
     ~€270/year (~3% of the LP savings at that value).
   - The effect is small and reported, so the model stays an LP.
-- **BAT-9** — End SoC ≥ initial SoC at the end of the year. Without this, the
-  LP drains the battery for free at the end and counts that energy as savings.
-  The RBC has no such condition (2023, base case: ends at 228.9 kWh vs.
-  120.5 kWh at the start, a small disadvantage for the RBC).
+- **BAT-9** — End SoC ≥ initial SoC at the end of the year. Both models start
+  the year at 50% of capacity (120.5 kWh), energy that was never paid for.
+  Without this condition, the LP would use that energy during the year and end
+  empty, counting it as savings. With it, every kWh discharged must also be
+  charged within the year. The RBC has no such condition (2023, base case:
+  ends at 228.9 kWh, a small disadvantage for the RBC, which paid for energy
+  it did not use).
 
 ---
 
