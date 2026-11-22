@@ -1,7 +1,8 @@
 # bess-office
 
-**Same battery, different control: after battery wear, rule-based control saves €461/year,
-optimization up to €5,304 (upper bound). The value is in arbitrage, not peak shaving.**
+**Same battery, different control: with battery wear priced in, rule-based peak shaving saves
+€461/year, while optimization saves up to €5,304 (upper bound), mostly by shifting energy to
+cheaper hours.**
 
 An open, transparent model for operating a battery (BESS) in an SME office building with a
 large-consumer grid connection (grootverbruik). At quarter-hour resolution over a full year, it compares:
@@ -16,8 +17,9 @@ standard profile for large-consumer offices (consumption). Every assumption has 
 ## Reference case
 
 A hypothetical office building, not a real site: consumption comes from a standard profile scaled to
-a typical Dutch office (DATA-8), PV is simulated for Delft. The battery is a commercially available
-product, the Boltainer BOLT-241; its efficiency and SoC limits are typical LFP values (DATA-9).
+a typical Dutch office (DATA-8), PV is simulated for Delft with PVGIS (fetched via pvlib). The battery
+is a commercially available product, the Boltainer BOLT-241; its efficiency and SoC limits are
+typical LFP values (DATA-9).
 
 | Component | Value |
 |---|---|
@@ -25,7 +27,7 @@ product, the Boltainer BOLT-241; its efficiency and SoC limits are typical LFP v
 | PV | 190 kWp, south, 12° → 186.6 MWh/year |
 | Battery | Boltainer BOLT-241: 241 kWh / 99 kW, 90% round-trip efficiency (loss applied on charging), SoC 10–95% |
 | Prices | ENTSO-E day-ahead NL 2023 |
-| Tariffs | transport €0.0226/kWh, monthly peak €3.57/kW, energy tax (energiebelasting) €0.03735/kWh (marginal bracket, 2026 rate) |
+| Tariffs | transport €0.0226/kWh, monthly peak €3.57/kW, energy tax (energiebelasting) €0.03735/kWh (marginal bracket, 2026 rate); GTV €3.74/kW not yet modeled (NET-8) |
 | Battery wear | €0.04 per kWh discharged (BAT-10) |
 
 ## Results (2023)
@@ -69,7 +71,7 @@ Both charts show the base case; battery wear is a separate cost component.
 ## Findings
 
 - **The control strategy makes the difference.** With the same battery, the RBC saves €461 and the LP €5,304.
-- **The value lies in arbitrage, not in peak reduction.** Of the LP savings, ~€5,800 comes from
+- **The LP's value lies mostly in shifting energy, not in peak reduction.** Of the LP savings, ~€5,800 comes from
   day-ahead energy, minus ~€500 lower export revenue (the battery stores PV instead of exporting
   it), ~€1,200 from transport and tax, and ~€1,000 from the monthly peak; battery wear costs
   ~€2,200. Even eliminating all peak costs would yield at most €3,776/year.
@@ -83,7 +85,9 @@ Both charts show the base case; battery wear is a separate cost component.
 - **Self-consumption and peak shaving compete for the same SoC.** At 72 kW grid charging keeps the
   battery full for the next peak, so it stores no PV at all (self-consumption 78.3%, the same as
   without a battery). Without grid charging it would store some PV (79.2%) but no longer hold the
-  peak, at almost the same net cost. In a rule that trade-off is hidden; in the LP it is explicit.
+  peak, at almost the same modeled net cost; the lower annual peak with grid charging would also
+  allow a smaller contracted capacity, which is not modeled (NET-8). In a rule that trade-off is
+  hidden; in the LP it is explicit.
 - **Pricing wear cuts cycling more than savings.** Compared with free wear, the LP at €0.04/kWh
   cycles 45% less (486 → 268) and keeps 64% of its savings: it drops the least profitable cycles.
   The RBC can only respond through its threshold: 52 → 72 kW, 102 → 32 cycles, keeping 43% of its
@@ -98,6 +102,10 @@ Both charts show the base case; battery wear is a separate cost component.
   That value counts hardware only and attributes all wear to cycling, an upper bound if calendar
   ageing dominates; with free wear the savings rise to €1,066 (RBC) and €8,264 (LP). Capacity fade
   itself is not modeled (BAT-3).
+- **GTV not modeled:** a lower annual peak would allow a smaller contracted capacity, which is
+  not counted. This undervalues the RBC most: in the base case it lowers the annual peak from
+  96.5 to 72 kW (LP: 84.6 kW), worth roughly €1,200/year (RBC) and €700/year (LP) at the GTV
+  tariff, before a safety margin (NET-8).
 - **One price year, in-sample:** not tested whether other years turn out higher or lower (NET-4).
 - **Smoothed consumption profile:** an average of many buildings, so the value of peak reduction
   is probably underestimated (DATA-7).
@@ -105,8 +113,8 @@ Both charts show the base case; battery wear is a separate cost component.
   scenario, so savings are unaffected, but absolute net costs are understated (NET-5).
 - **Battery specs not verified:** efficiency and SoC range are typical LFP values (DATA-9). Grid
   tariffs are verified against the Liander 2026 tariff sheet (NET-8).
-- **Not modeled:** contracted transport capacity (GTV, NET-8), lower export price (NET-9), and simultaneous
-  charging/discharging at negative prices is measured but not excluded (BAT-8, ≤ €8/year).
+- **Not modeled:** lower export price (NET-9), and simultaneous charging/discharging at negative
+  prices is measured but not excluded (BAT-8, ≤ €8/year).
 
 ## Data
 
