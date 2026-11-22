@@ -274,16 +274,17 @@ Both models are costed with the same formula (`compute_financial_metrics` in
   it requires binary variables, which would turn the LP into a MILP: much
   slower over 35,040 quarter-hours, and without a guaranteed global optimum in
   practical time.
-  - Why it happens: at negative prices, wasting energy through charging losses
-    earns money, so charging and discharging at the same time is optimal for
-    the LP.
+  - Why it happens: wasting energy through charging losses earns money when
+    the price is negative enough to outweigh the transport tariff, energy tax
+    and degradation cost of the extra cycling. With free wear this happens at
+    many negative prices; with the base-case wear cost only at strongly
+    negative prices, which is why the count drops from 398 to 16 quarter-hours.
   - Checked (2023 data, scripts/check_bat8.py), base case (€0.04/kWh,
     BAT-10): 16 of 35,032 quarter-hours, all at a negative price
     (1,256 quarter-hours < 0). 15 kWh is lost, at most ~€8/year even at the
-    lowest price (−500 EUR/MWh): ~0.1% of the LP savings. With free wear
-    (BAT-10, 0): 398 quarter-hours, also all at a
-    negative price, 546 kWh lost, at most ~€270/year (~3% of the LP savings
-    at that value).
+    lowest price (−500 EUR/MWh): ~0.1% of the LP savings. With free wear: 398
+    quarter-hours, also all at a negative price, 546 kWh lost, at most
+    ~€270/year (~3% of the LP savings at that value).
   - The effect is small and reported, so the model stays an LP.
 - **BAT-9** — End SoC ≥ initial SoC at the end of the year. Without this, the
   LP drains the battery for free at the end and counts that energy as savings.
