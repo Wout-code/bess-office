@@ -2,9 +2,6 @@
 
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")  # write to file only, no display needed
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 
@@ -28,7 +25,7 @@ def _eur(value: float, _pos=None) -> str:
     return f"€{value / 1000:.0f}k"
 
 
-def plot_cost_breakdown(financials: dict[str, dict], path: Path) -> Path:
+def plot_cost_breakdown(financials: dict[str, dict], path: Path, show: bool = True) -> Path:
     """
     Stacked bar chart of annual cost per component, one bar per scenario.
 
@@ -39,6 +36,10 @@ def plot_cost_breakdown(financials: dict[str, dict], path: Path) -> Path:
         Insertion order is the bar order.
     path : Path
         Output PNG path; parent directories are created if needed.
+    show : bool
+        If True, also open the figure in a window after saving. The call then
+        waits until the window is closed. Without a display (e.g. on a server)
+        matplotlib falls back to a non-interactive backend and only warns.
 
     Returns
     -------
@@ -116,5 +117,7 @@ def plot_cost_breakdown(financials: dict[str, dict], path: Path) -> Path:
 
     fig.tight_layout()
     fig.savefig(path, dpi=150, facecolor=SURFACE)
+    if show:
+        plt.show()
     plt.close(fig)
     return path
