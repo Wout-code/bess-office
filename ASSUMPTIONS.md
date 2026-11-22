@@ -124,19 +124,23 @@ Both models use the same battery model.
   the base case (BAT-10), on top of the charging losses and grid costs of
   cycling.
   - Why it matters: the LP cycles far more than the RBC (equivalent full
-    cycles per year, 2023, base case: RBC 32, LP 268). With free wear the gap
-    is RBC 102, LP 486, and the LP savings would be to optimistic.
+    cycles per year, 2023, base case: RBC 32, LP 268; with free wear RBC 102,
+    LP 486), so how wear is priced affects the LP most.
   - What drives wear here: at low C-rates (this system: 99 kW / 241 kWh ≈
-    0.41C), ageing is driven mainly by time, temperature and energy throughput,
-    and hardly by depth of discharge (Wang et al., 2011, on LFP cells). The
-    right correction is therefore a cost per kWh of throughput, not a
+    0.41C), LFP ageing is driven mainly by time, temperature and throughput,
+    and hardly by depth of discharge (Wang et al., 2011,
+    [doi:10.1016/j.jpowsour.2010.11.134](https://doi.org/10.1016/j.jpowsour.2010.11.134);
+    tested from C/2 to 10C, so 0.41C is a slight extrapolation). The right
+    correction is therefore a cost per kWh of throughput, not a
     depth-of-discharge cost.
   - Open question: how large that cost should be depends on how calendar and
-    cycle ageing combine. If the battery is replaced at the end of its calendar
-    life anyway, extra cycles cost little: even the free-wear LP (486 cycles
-    per year) reaches ≥ 6,000 cycles (DATA-9) only after ~12 years, the
-    base-case LP (268) after ~22 years. If both add up, every cycle shortens
-    the battery's life and the cost per kWh is substantial.
+    cycle ageing combine. Wang et al. cycled their cells continuously, so time
+    and throughput grew together and their model does not separate the two.
+    If the battery is replaced at the end of its calendar life anyway, extra
+    cycles cost little: even the free-wear LP (486 cycles per year) reaches
+    ≥ 6,000 cycles (DATA-9) only after ~12 years, the base-case LP (268) after
+    ~22 years. If both add up, every cycle shortens the battery's life and the
+    cost per kWh is substantial.
   - This is why BAT-10 uses a cost per kWh of throughput and runs it as a
     range rather than a single value.
 - **BAT-4** — No minimum on/off time: the battery can switch every
