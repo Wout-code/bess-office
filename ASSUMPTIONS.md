@@ -47,14 +47,16 @@ check the matching comment in the code.
   building-integrated; panels on a low frame on a flat roof are in between,
   with less airflow than free-standing, so PV yield may be slightly
   overestimated.
-
+  
 **DATA-6 — Load data (Liander K&O profile)**
 - Liander's own standard profile for offices, built from telemetry of large
-  consumers and used by Liander to estimate new large-consumer connections
-  (source: Liander, "MOOI EIGEN SBI-profielen"). It is a normalized shape, not
-  a measurement of one building; the absolute level comes from the scaling in
-  DATA-8. This matches the modeled building: at that scale its peak (99.4 kW)
-  is well above the large-consumer threshold.
+  consumers and used by Liander to estimate new large-consumer connections.
+  Source: Liander open data, dataset "Verbruiksprofielen
+  grootverbruikaansluitingen elektriciteit", documented in
+  ["Toelichting externe documentatie SBI-profielen Liander"](https://www.liander.nl/-/media/files/open-data/verbruiksprofielen-gv-elektriciteit-2023/toelichting-externe-documentatie-sbi-profielen-liander.pdf).
+  It is a normalized shape, not a measurement of one building; the absolute
+  level comes from the scaling in DATA-8. This matches the modeled building:
+  at that scale its peak (99.4 kW) is well above the large-consumer threshold.
 - Because it is a normalized 365 × 96 profile without real clock changes, it
   is made tz-aware pragmatically: the missing hour in March is shifted forward
   (duplicates dropped), and the double hour in October is assigned to summer
