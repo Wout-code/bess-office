@@ -77,28 +77,32 @@ Battery wear (€0.04/kWh discharged) is counted as a separate cost component; s
 
 ## Findings
 
-- **The control strategy makes the difference.** With the same battery, the RBC saves €461 and the LP €5,304.
+- **The control strategy makes the difference.** With the same battery, the peak-shaving RBC saves
+  €461 and the LP €5,304. Most of the gap is arbitrage, which the RBC does not attempt: it never
+  looks at prices (ARCH-1). A price-aware rule would close part of the gap; how much is not tested.
 - **The LP's value lies mostly in shifting energy, not in peak reduction.** Of the LP savings, ~€5,800 comes from
   day-ahead energy, minus ~€500 lower export revenue (the battery stores PV instead of exporting
   it), ~€1,200 from transport and tax, and ~€1,000 from the monthly peak; battery wear costs
-  ~€2,200. Even eliminating all peak costs would yield at most €3,776/year.
-- **With wear priced, the RBC becomes a pure peak shaver.** Its cheapest threshold rises from
-  52 kW (free wear) to 72 kW. At 52 kW an office's broad winter peak empties the usable 205 kWh
-  before the end of the working day, so the RBC holds 52 kW only in April–August and pays wear on
-  102 cycles a year. At 72 kW it holds the threshold in every month (annual peak 96.5 → 72 kW) with
-  32 cycles. The LP lets its peak rise above 72 kW in October–January (84.6 kW in January) because
-  arbitrage earns more there, but its peaks are lower in the other months, so its total peak cost
-  is still lower.
-- **Self-consumption and peak shaving compete for the same SoC.** At 72 kW grid charging keeps the
-  battery full for the next peak, so it stores no PV at all (self-consumption 78.3%, the same as
-  without a battery). Without grid charging it would store some PV (79.2%) but no longer hold the
-  peak, at almost the same modeled net cost; the lower annual peak with grid charging would also
-  allow a smaller contracted capacity, which is not modeled (NET-8). In a rule that trade-off is
-  hidden; in the LP it is explicit.
-- **Pricing wear cuts cycling more than savings.** Compared with free wear, the LP at €0.04/kWh
-  cycles 45% less (486 → 268) and keeps 64% of its savings: it drops the least profitable cycles.
-  The RBC can only respond through its threshold: 52 → 72 kW, 102 → 32 cycles, keeping 43% of its
-  savings (€1,066 → €461).
+  ~€2,200. The peak tariff is only ~6% of the annual cost without a battery, against ~60% for
+  electricity bought, so even eliminating all peak costs would yield at most €3,776/year.
+- **With wear priced, the RBC raises its threshold and cycles less (52 → 72 kW, 102 → 32 cycles).**
+  At 52 kW an office's broad winter peak empties the usable 205 kWh before the end of the working
+  day, so the RBC keeps grid import below 52 kW only in April–August, while discharging far more
+  often. At 72 kW it keeps import below the threshold in every month (annual peak 96.5 → 72 kW) and
+  discharges only at the highest peaks. The LP lets its peak rise above 72 kW in October–January
+  (84.6 kW in January) because arbitrage earns more there, but its peaks are lower in the other
+  months, so its total peak cost is still lower.
+- **The RBC keeps the battery full for peaks, so it stores no PV.** At 72 kW the RBC charges from
+  the grid to be ready for the next peak, which leaves no room for PV: self-consumption stays at
+  78.3%, the same as without a battery. Without grid charging it would store some PV (79.2%) but
+  no longer keep import below 72 kW, at almost the same modeled net cost; the lower annual peak
+  with grid charging would also allow a smaller contracted capacity, which is not modeled (NET-8).
+  In the RBC this choice is fixed by its rules; the LP weighs both uses of the battery in euros
+  and picks per timestep.
+- **The LP adapts to wear cost better than the RBC.** Going from free wear to €0.04/kWh, the LP
+  cycles 45% less (486 → 268) yet keeps 64% of its savings: it drops exactly the cycles that
+  earned less than the wear they cause. The RBC can only raise its threshold (see above), which
+  cuts its cycles by 69% and leaves 43% of its savings (€1,066 → €461).
 
 ## Limitations
 
@@ -145,7 +149,7 @@ HiGHS solver, are installed by `uv sync`.
 
 ```bash
 uv sync
-uv run main.py   # no battery, RBC, LP + degradation sensitivity → costs + plots (~90 s)
+uv run main.py   # no battery, RBC, LP + degradation sensitivity → costs + plots (about 2 minutes)
 uv run pytest
 ```
 
@@ -156,6 +160,8 @@ The key open question: how much of the €5,304 remains without perfect knowledg
 - **Rolling-horizon optimization:** optimize daily over 24–48 hours using forecasts.
 - **Sensitivity to noise:** savings under increasing errors in price, PV and consumption forecasts.
 - **GTV and congestion:** the value of a smaller grid connection.
+- **Price-aware RBC:** a rule that also charges in cheap and discharges in expensive hours, as a
+  fairer baseline for the LP.
 - **Payback:** investment cost (installed), payback period with and without subsidies (e.g. Flex-e).
 - **More years:** other price years, RBC threshold out-of-sample.
 - **Real building data:** replace the averaged standard profile with the measured consumption of a
