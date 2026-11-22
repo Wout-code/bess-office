@@ -14,8 +14,8 @@ The objective is the total annual cost in EUR, with five components:
 - energy: (import - export) x day-ahead price (NET-7),
 - transport: tariff per kWh of grid import,
 - energy tax: tariff per kWh of grid import, no netting (NET-5),
-- storage tax: tariff per kWh charged into the battery, 0 by default;
-  only non-zero in the hypothetical double-tax scenario (NET-6),
+- degradation: cost per kWh discharged from the battery, 0 by default;
+  non-zero in the degradation-cost sensitivity (BAT-10),
 - monthly peak: tariff per kW of the highest quarter-hour import in
   each calendar month (NET-4).
 All components are already in EUR, so this is a single-objective LP
@@ -26,8 +26,9 @@ Solver: HiGHS via highspy, installed by `uv sync` like the other dependencies.
 
 # Known simplifications in this file (see ASSUMPTIONS.md):
 # - BAT-1: symmetric power, power_kw is used for both directions.
-# - BAT-3: no degradation cost -- battery wear is free; the solver only weighs
-#   charging losses and grid costs when cycling.
+# - BAT-3: no physical degradation -- capacity and efficiency stay constant.
+#   Wear is free by default; the solver then only weighs charging losses and
+#   grid costs when cycling. BAT-10 adds an optional cost per kWh discharged.
 # - BAT-4: no minimum on/off time, the battery can switch every quarter-hour.
 # - BAT-8: simultaneous charging/discharging is not excluded; it happens only
 #   at negative prices and costs ~3% of the savings, so it is accepted.
@@ -51,7 +52,7 @@ def run_lp_dispatch(
     """
     Solve a single linear program for battery dispatch over the full
     horizon, minimizing total cost (energy + transport + energy tax +
-    storage tax + monthly peak).
+    degradation + monthly peak).
 
     Parameters
     ----------
@@ -66,13 +67,13 @@ def run_lp_dispatch(
     battery : BatteryConfig
         Same battery model as dispatch_sim.py. power_kw is used for both
         charging and discharging (BAT-1, see ASSUMPTIONS.md).
+        degradation_cost_eur_per_kwh: EUR per kWh discharged (BAT-10);
+        0.0 by default, i.e. wear is free (BAT-3).
     grid_tariff : GridTariffConfig
         Components used here (see config.py docstring for the full
         picture and what is deliberately left out):
         - transport_tariff_eur_per_kwh: EUR per kWh of grid import.
         - energy_tax_eur_per_kwh: EUR per kWh of grid import (NET-5).
-        - storage_charge_tax_eur_per_kwh: EUR per kWh charged into the
-          battery; 0.0 except in the storage double-tax scenario (NET-6).
         - monthly_peak_tariff_eur_per_kw: EUR per kW of the highest
           import in a calendar month, charged separately per month
           (Liander's "kW max. mnd" component). The GTV/annual-contract
@@ -168,8 +169,8 @@ def run_lp_dispatch(
             + m.grid_import[t] * grid_tariff.transport_tariff_eur_per_kwh
             # energy tax only on import, no net metering (NET-5)
             + m.grid_import[t] * grid_tariff.energy_tax_eur_per_kwh
-            # scenario B: tax on everything that goes into the battery (NET-6)
-            + m.charge[t] * grid_tariff.storage_charge_tax_eur_per_kwh
+            # degradation cost per kWh discharged (BAT-10), 0 by default
+            + m.discharge[t] * battery.degradation_cost_eur_per_kwh
             for t in m.T
         )
         peak_cost = sum(m.peak_import_kw[month] for month in m.M) * grid_tariff.monthly_peak_tariff_eur_per_kw

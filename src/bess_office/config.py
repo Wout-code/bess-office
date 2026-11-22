@@ -12,6 +12,16 @@ class BatteryConfig:
     min_soc_fraction: float = 0.10       # not in datasheet, typical LFP value (DATA-9)
     max_soc_fraction: float = 0.95       # not in datasheet, typical LFP value (DATA-9)
     initial_soc_fraction: float = 0.50
+    # Degradation cost per kWh DISCHARGED (BAT-10), in the LP objective and in
+    # main.compute_financial_metrics. 0.0 = wear is free (BAT-3). Central value
+    # 0.04 = replaceable hardware ~200 EUR/kWh x 241 kWh (~48,200 EUR) /
+    # (6,000 cycles x 204.85 usable kWh per cycle) = ~0.039 EUR/kWh.
+    degradation_cost_eur_per_kwh: float = 0.0
+    # Values main.py runs the degradation-cost sensitivity for (BAT-10):
+    # 0 = wear is free (calendar ageing dominates), 0.04 = central value,
+    # 0.06 = stress case, e.g. 4,000 instead of 6,000 cycles:
+    # 48,200 / (4,000 x 204.85) = ~0.059 EUR/kWh.
+    degradation_cost_sensitivity_eur_per_kwh: tuple[float, ...] = (0.0, 0.02, 0.04, 0.06)
 
 
 @dataclass
@@ -85,10 +95,6 @@ class GridTariffConfig:
     # Energy tax, marginal bracket 50,000-10 million kWh, 2026, excl. VAT;
     # import only, no net metering for large consumers (NET-5).
     energy_tax_eur_per_kwh: float = 0.03735
-
-    # Extra tax per kWh charged into the battery: 0.0 = scenario A,
-    # equal to energy_tax_eur_per_kwh = scenario B (NET-6).
-    storage_charge_tax_eur_per_kwh: float = 0.0
 
     # GTV component, not used yet (NET-8): EUR per kW contracted, per month.
     contracted_capacity_kw: float | None = None

@@ -121,7 +121,7 @@ def plot_cost_breakdown(financials: dict[str, dict], path: Path, show: bool = Tr
 
     ax.set_ylabel("EUR per year", color=TEXT_SECONDARY)
     ax.set_title(
-        "Annual cost per component, scenario A\n(2023 prices and PV, 2026 tariffs)",
+        "Annual cost per component, no degradation cost\n(2023 prices and PV, 2026 tariffs)",
         color=TEXT_PRIMARY,
         loc="left",
         fontsize=12,
@@ -209,7 +209,7 @@ def plot_savings_breakdown(
 
     ax.set_ylabel("Saving vs. no battery, EUR per year", color=TEXT_SECONDARY)
     ax.set_title(
-        "Where the savings come from, scenario A\n(2023 prices and PV, 2026 tariffs)",
+        "Where the savings come from, no degradation cost\n(2023 prices and PV, 2026 tariffs)",
         color=TEXT_PRIMARY,
         loc="left",
         fontsize=12,

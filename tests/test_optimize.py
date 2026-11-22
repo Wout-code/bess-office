@@ -4,6 +4,7 @@ Deliberately run with timestep_hours=0.25: with hourly data kWh == kW and
 unit errors stay invisible (see CLAUDE.md, Units).
 """
 
+import dataclasses
 import math
 
 import numpy as np
@@ -133,3 +134,17 @@ def test_lp_zero_battery_matches_no_battery():
     assert result["grid_export_kwh"].to_numpy() == pytest.approx(expected_export, abs=TOL)
     assert result["charge_kwh"].abs().max() <= TOL
     assert result["discharge_kwh"].abs().max() <= TOL
+
+
+def test_lp_higher_degradation_cost_cycles_less(battery):
+    # BAT-10: a cost per kWh discharged can only make cycling less attractive,
+    # so a higher degradation cost never leads to more discharge.
+    free = run_lp_dispatch(_pv(), _load(), _prices(), battery, GridTariffConfig(), timestep_hours=DT)
+    # 0.10 EUR/kWh is a synthetic test value, chosen high enough to change the
+    # dispatch on this day (lower values leave it unchanged: the spread is wide).
+    costly_battery = dataclasses.replace(battery, degradation_cost_eur_per_kwh=0.10)
+    costly = run_lp_dispatch(_pv(), _load(), _prices(), costly_battery, GridTariffConfig(), timestep_hours=DT)
+
+    assert costly["discharge_kwh"].sum() <= free["discharge_kwh"].sum() + TOL
+    # Not trivially equal: at this value the LP really drops some cycling.
+    assert costly["discharge_kwh"].sum() < free["discharge_kwh"].sum() - 1.0

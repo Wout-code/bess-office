@@ -1,5 +1,6 @@
 """BAT-8 check: quarter-hours with simultaneous charge and discharge, per solver
-and scenario. Data prep copied from main.main() (not importable separately).
+and degradation cost (0 and the central value 0.04 EUR/kWh, BAT-10). Data prep
+copied from main.main() (not importable separately).
 
 Usage: uv run python scripts/check_bat8.py [solver ...]   (default: appsi_highs)
 
@@ -35,8 +36,7 @@ prices = get_day_ahead_prices(
 pv, load = pv.align(load, join="inner")
 prices = prices.reindex(load.index, method="ffill")
 
-tariff_a = CONFIG.grid_tariff
-tariff_b = dataclasses.replace(tariff_a, storage_charge_tax_eur_per_kwh=tariff_a.energy_tax_eur_per_kwh)
+DEGRADATION_COSTS_EUR_PER_KWH = (0.0, 0.04)  # without wear cost, central value (BAT-10)
 eta = CONFIG.battery.round_trip_efficiency
 usable = (CONFIG.battery.max_soc_fraction - CONFIG.battery.min_soc_fraction) * CONFIG.battery.capacity_kwh
 
@@ -45,8 +45,10 @@ solvers = sys.argv[1:] or ["appsi_highs"]
 print(f"n quarter-hours: {len(load)}, negative-price qh: {(prices < 0).sum()}, min price {prices.min():.2f} EUR/MWh")
 for solver in solvers:
     opt.pyo.SolverFactory = lambda name, _s=solver: _orig_factory(_s)
-    for name, tariff in [("A", tariff_a), ("B", tariff_b)]:
-        r = opt.run_lp_dispatch(pv, load, prices, CONFIG.battery, tariff, timestep_hours=ts)
+    for degradation_cost in DEGRADATION_COSTS_EUR_PER_KWH:
+        battery = dataclasses.replace(CONFIG.battery, degradation_cost_eur_per_kwh=degradation_cost)
+        name = f"deg={degradation_cost:.2f}"
+        r = opt.run_lp_dispatch(pv, load, prices, battery, CONFIG.grid_tariff, timestep_hours=ts)
         for eps in (1e-6, 1e-3):
             mask = (r["charge_kwh"] > eps) & (r["discharge_kwh"] > eps)
             p = prices[mask]

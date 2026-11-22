@@ -7,8 +7,9 @@ reference building) and day-ahead prices (ENTSO-E), align them to quarter-
 hours, run both dispatch methods and translate the results to EUR.
 
 Output: a comparison of no battery, RBC (dispatch_sim.py) and LP (optimize.py)
-on peak reduction and euros, for scenario A (base) and B (double energy tax on
-storage, NET-6), plus a cost breakdown plot. Run with `uv run main.py`.
+on peak reduction and euros without degradation cost, a sensitivity analysis
+over the degradation cost per kWh discharged (BAT-10), and cost and savings
+breakdown plots. Run with `uv run main.py`.
 """
 
 import dataclasses
@@ -30,7 +31,11 @@ RESULTS_DIR = Path(__file__).parent / "results"
 
 
 def compute_financial_metrics(
-    result: pd.DataFrame, prices_eur_mwh: pd.Series, grid_tariff, timestep_hours: float
+    result: pd.DataFrame,
+    prices_eur_mwh: pd.Series,
+    grid_tariff,
+    battery: BatteryConfig,
+    timestep_hours: float,
 ) -> dict:
     """Translate a dispatch result (kWh) into EUR.
 
@@ -42,7 +47,8 @@ def compute_financial_metrics(
     - import cost and export revenue at the day-ahead price (NET-7, NET-9),
     - transport tariff per kWh imported,
     - energy tax per kWh imported, no netting (NET-5),
-    - storage tax per kWh charged into the battery (NET-6, 0 in scenario A),
+    - degradation cost per kWh discharged from the battery (BAT-10, 0 by
+      default),
     - monthly peak tariff per kW of the highest quarter-hour import per
       calendar month (NET-4).
 
@@ -56,7 +62,7 @@ def compute_financial_metrics(
     export_revenue = (result["grid_export_kwh"] * prices_eur_kwh).sum()
     transport_cost = result["grid_import_kwh"].sum() * grid_tariff.transport_tariff_eur_per_kwh
     energy_tax_cost = result["grid_import_kwh"].sum() * grid_tariff.energy_tax_eur_per_kwh
-    storage_tax_cost = result["charge_kwh"].sum() * grid_tariff.storage_charge_tax_eur_per_kwh
+    degradation_cost = result["discharge_kwh"].sum() * battery.degradation_cost_eur_per_kwh
 
     # Monthly peak: kWh per timestep -> kW, highest per calendar month.
     peak_import_kw_per_step = result["grid_import_kwh"] / timestep_hours
@@ -68,10 +74,10 @@ def compute_financial_metrics(
         "export_revenue_eur": export_revenue,
         "transport_cost_eur": transport_cost,
         "energy_tax_cost_eur": energy_tax_cost,
-        "storage_tax_cost_eur": storage_tax_cost,
+        "degradation_cost_eur": degradation_cost,
         "peak_cost_eur": peak_cost,
         "net_cost_eur": (
-            import_cost + transport_cost + energy_tax_cost + storage_tax_cost + peak_cost - export_revenue
+            import_cost + transport_cost + energy_tax_cost + degradation_cost + peak_cost - export_revenue
         ),
         "monthly_peak_kw": monthly_peak_kw,
     }
@@ -108,7 +114,7 @@ def select_rbc_threshold(
         result = run_baseline_dispatch(
             pv_kwh, load_kwh, battery, peak_threshold_kw=float(threshold_kw), timestep_hours=timestep_hours
         )
-        financials = compute_financial_metrics(result, prices_eur_mwh, grid_tariff, timestep_hours)
+        financials = compute_financial_metrics(result, prices_eur_mwh, grid_tariff, battery, timestep_hours)
         net_cost_eur[float(threshold_kw)] = financials["net_cost_eur"]
     scan = pd.Series(net_cost_eur, name="net_cost_eur")
     return float(scan.idxmin()), scan
@@ -133,7 +139,7 @@ def print_dispatch_report(label: str, result: pd.DataFrame, metrics: dict, finan
     print(f"Export revenue ({label}):  €{financials['export_revenue_eur']:.2f}")
     print(f"Transport cost ({label}):  €{financials['transport_cost_eur']:.2f}")
     print(f"Energy tax ({label}):      €{financials['energy_tax_cost_eur']:.2f}")
-    print(f"Storage tax ({label}):     €{financials['storage_tax_cost_eur']:.2f}")
+    print(f"Degradation cost ({label}): €{financials['degradation_cost_eur']:.2f}")
     print(f"Peak/capacity cost ({label}): €{financials['peak_cost_eur']:.2f}")
     print(f"Net cost ({label}):        €{financials['net_cost_eur']:.2f}")
     print()
@@ -205,7 +211,7 @@ def main() -> None:
         no_battery_result, peak_threshold_kw=rbc_threshold_kw, timestep_hours=CONFIG.sim.timestep_hours
     )
     no_battery_financials = compute_financial_metrics(
-        no_battery_result, prices_quarter, CONFIG.grid_tariff, CONFIG.sim.timestep_hours
+        no_battery_result, prices_quarter, CONFIG.grid_tariff, CONFIG.battery, CONFIG.sim.timestep_hours
     )
     print_dispatch_report("No battery", no_battery_result, no_battery_metrics, no_battery_financials)
 
@@ -223,7 +229,7 @@ def main() -> None:
         timestep_hours=CONFIG.sim.timestep_hours,
     )
     rbc_financials = compute_financial_metrics(
-        rbc_result, prices_quarter, CONFIG.grid_tariff, CONFIG.sim.timestep_hours
+        rbc_result, prices_quarter, CONFIG.grid_tariff, CONFIG.battery, CONFIG.sim.timestep_hours
     )
     print_dispatch_report("RBC (baseline)", rbc_result, rbc_metrics, rbc_financials)
 
@@ -245,7 +251,7 @@ def main() -> None:
         timestep_hours=CONFIG.sim.timestep_hours,
     )
     lp_financials = compute_financial_metrics(
-        lp_result, prices_quarter, CONFIG.grid_tariff, CONFIG.sim.timestep_hours
+        lp_result, prices_quarter, CONFIG.grid_tariff, CONFIG.battery, CONFIG.sim.timestep_hours
     )
     print_dispatch_report("LP optimization", lp_result, lp_metrics, lp_financials)
 
@@ -266,45 +272,43 @@ def main() -> None:
     )
     print()
 
-    # --- Scenario B: hypothetical double energy tax on storage (NET-6) ---
-    # The RBC never looks at prices (ARCH-1), so its dispatch stays the same and
-    # only its costs are recalculated. The LP is re-solved.
-    tariff_b = dataclasses.replace(
-        CONFIG.grid_tariff, storage_charge_tax_eur_per_kwh=CONFIG.grid_tariff.energy_tax_eur_per_kwh
-    )
-    rbc_financials_b = compute_financial_metrics(rbc_result, prices_quarter, tariff_b, CONFIG.sim.timestep_hours)
-    lp_result_b = run_lp_dispatch(
-        pv_quarter, load, prices_quarter, CONFIG.battery, tariff_b, timestep_hours=CONFIG.sim.timestep_hours
-    )
-    lp_financials_b = compute_financial_metrics(lp_result_b, prices_quarter, tariff_b, CONFIG.sim.timestep_hours)
-
-    # Without a battery nothing is charged, so B equals A here.
-    no_battery_financials_b = compute_financial_metrics(
-        no_battery_result, prices_quarter, tariff_b, CONFIG.sim.timestep_hours
-    )
-
-    print("=== Scenario A (base) vs. B (double tax on storage) ===")
-    print(f"{'':36}{'A':>12}{'B':>12}")
-    for label, fin_a, fin_b in [
-        ("Net cost no battery", no_battery_financials, no_battery_financials_b),
-        ("Net cost RBC", rbc_financials, rbc_financials_b),
-        ("Net cost LP", lp_financials, lp_financials_b),
-    ]:
-        print(f"{label:36}{fin_a['net_cost_eur']:>12.2f}{fin_b['net_cost_eur']:>12.2f}")
-    for label, fin_a, fin_b in [
-        ("Savings RBC vs. no battery", rbc_financials, rbc_financials_b),
-        ("Savings LP vs. no battery", lp_financials, lp_financials_b),
-    ]:
-        saving_a = no_battery_financials["net_cost_eur"] - fin_a["net_cost_eur"]
-        saving_b = no_battery_financials_b["net_cost_eur"] - fin_b["net_cost_eur"]
-        print(f"{label:36}{saving_a:>12.2f}{saving_b:>12.2f}")
+    # --- Sensitivity: degradation cost per kWh discharged (BAT-10) ---
+    # The RBC never looks at prices or costs (ARCH-1), so its dispatch (and its
+    # 52 kW threshold, chosen without degradation cost) stays the same; only its
+    # costs are recalculated. The LP is re-solved for every value. The no-battery
+    # reference discharges nothing, so its cost is the same for every value.
+    print("=== Sensitivity: degradation cost per kWh discharged (BAT-10) ===")
+    print(f"Net cost no battery: €{no_battery_financials['net_cost_eur']:.2f} (independent of degradation cost)")
     print(
-        f"{'Cycles/year LP':36}{equivalent_full_cycles(lp_result, CONFIG.battery):>12.0f}"
-        f"{equivalent_full_cycles(lp_result_b, CONFIG.battery):>12.0f}"
+        f"{'EUR/kWh':>8}{'Net cost RBC':>14}{'Savings RBC':>13}"
+        f"{'Net cost LP':>14}{'Savings LP':>12}{'Cycles/yr LP':>14}"
     )
+    for degradation_cost in CONFIG.battery.degradation_cost_sensitivity_eur_per_kwh:
+        battery_d = dataclasses.replace(CONFIG.battery, degradation_cost_eur_per_kwh=degradation_cost)
+        rbc_financials_d = compute_financial_metrics(
+            rbc_result, prices_quarter, CONFIG.grid_tariff, battery_d, CONFIG.sim.timestep_hours
+        )
+        if degradation_cost == CONFIG.battery.degradation_cost_eur_per_kwh:
+            lp_result_d = lp_result  # already solved above with this value
+        else:
+            lp_result_d = run_lp_dispatch(
+                pv_quarter, load, prices_quarter, battery_d, CONFIG.grid_tariff,
+                timestep_hours=CONFIG.sim.timestep_hours,
+            )
+        lp_financials_d = compute_financial_metrics(
+            lp_result_d, prices_quarter, CONFIG.grid_tariff, battery_d, CONFIG.sim.timestep_hours
+        )
+        print(
+            f"{degradation_cost:>8.2f}"
+            f"{rbc_financials_d['net_cost_eur']:>14.2f}"
+            f"{no_battery_financials['net_cost_eur'] - rbc_financials_d['net_cost_eur']:>13.2f}"
+            f"{lp_financials_d['net_cost_eur']:>14.2f}"
+            f"{no_battery_financials['net_cost_eur'] - lp_financials_d['net_cost_eur']:>12.2f}"
+            f"{equivalent_full_cycles(lp_result_d, battery_d):>14.0f}"
+        )
     print()
 
-    # --- Plots: cost per component and savings per component, scenario A ---
+    # --- Plots: cost per component and savings per component, no degradation cost ---
     plot_path = plot_cost_breakdown(
         {
             "No battery": no_battery_financials,

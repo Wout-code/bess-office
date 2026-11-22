@@ -29,19 +29,33 @@ product, the Boltainer BOLT-241; its efficiency and SoC limits are typical LFP v
 
 ## Results (2023)
 
-Net annual cost = energy + transport + energy tax + monthly peak − export. Scenario B adds a
-hypothetical energy tax on every kWh that goes into the battery (NET-6).
+Net annual cost = energy + transport + energy tax + monthly peak − export. The sensitivity below
+adds a degradation cost per kWh discharged from the battery (BAT-10).
 
 | | No battery | RBC (52 kW) | LP |
 |---|---:|---:|---:|
-| Net cost A | €64,623 | €63,558 | €56,360 |
-| **Savings A** | – | **€1,066** | **€8,264** |
-| **Savings B** | – | **€191** | **€5,222** |
-| Annual peak import (A) | 96.5 kW | 96.5 kW | 86.8 kW |
-| Full cycles/year (A) | – | 102 | 486 |
+| Net cost (degradation cost 0) | €64,623 | €63,558 | €56,360 |
+| **Savings (degradation cost 0)** | – | **€1,066** | **€8,264** |
+| Annual peak import (degradation cost 0) | 96.5 kW | 96.5 kW | 86.8 kW |
+| Full cycles/year (degradation cost 0) | – | 102 | 486 |
 
 The LP knows the entire year in advance: **€8,264 is a theoretical upper bound**, not an achievable saving.
 Payback period: not yet calculated (investment costs are not in the model yet).
+
+### Sensitivity: degradation cost (BAT-10)
+
+Battery wear priced per kWh discharged, applied with the same formula to RBC and LP. Central value
+€0.04/kWh = replaceable hardware (~€200/kWh × 241 kWh) / (6,000 cycles × 204.85 usable kWh). The
+LP is re-solved per value; the RBC dispatch (and its 52 kW threshold) stays the same, only its
+costs are recalculated. €0 means wear is free (calendar ageing dominates); €0.06/kWh is a stress
+case, e.g. a cycle life of 4,000 instead of 6,000 cycles (~€0.059/kWh).
+
+| Degradation cost | Savings RBC | Savings LP | LP cycles/year |
+|---:|---:|---:|---:|
+| €0.00/kWh | €1,066 | €8,264 | 486 |
+| €0.02/kWh | €646 | €6,571 | 358 |
+| **€0.04/kWh** | **€226** | **€5,304** | **268** |
+| €0.06/kWh | −€194 | €4,313 | 218 |
 
 ![Savings per component versus no battery](results/savings_breakdown.png)
 
@@ -58,16 +72,20 @@ Payback period: not yet calculated (investment costs are not in the model yet).
 - **Self-consumption and peak shaving compete for the same SoC.** Grid charging keeps the battery full
   for the next peak, but leaves less room for PV: at the same threshold, the RBC with
   grid charging is even slightly more expensive than without. In a rule that trade-off is hidden; in the LP it is explicit.
-- **A tax on storage weighs heavily.** Scenario B costs the LP ~37% and the RBC ~82% of its savings.
+- **Pricing wear cuts cycling more than savings, but only for the LP.** At €0.04/kWh the LP
+  cycles 45% less (486 → 268) and keeps 64% of its savings (€5,304): it drops the least profitable
+  cycles. The RBC does not look at costs, so it pays the full wear cost on its 102 cycles: its
+  savings fall to €226 and turn negative at €0.06/kWh (with its threshold fixed at 52 kW).
 
 ## Limitations
 
 - **Dynamic (day-ahead) contract assumed:** the logical contract for arbitrage. Behind a fixed-price
   contract the ~€6,600 arbitrage component does not apply (NET-7).
 - **Perfect foresight:** the LP result is an upper bound (TIME-2).
-- **No degradation cost:** battery wear is free in the model (BAT-3). Since wear scales mainly
-  with energy throughput, this favours the LP most: it runs 486 full cycles/year versus 102 for
-  the RBC. The LP savings are therefore optimistic on two counts: perfect foresight and free cycling.
+- **Degradation only as a sensitivity:** the headline results have free wear (BAT-3). At the central
+  €0.04/kWh, savings fall to €226 (RBC) and €5,304 (LP) (BAT-10). That value counts hardware only
+  and attributes all wear to cycling, an upper bound if calendar ageing dominates; capacity fade
+  itself is not modeled, and the RBC threshold is not re-chosen per degradation cost.
 - **One price year, in-sample:** not tested whether other years turn out higher or lower (NET-4).
 - **Smoothed consumption profile:** an average of many buildings, so the value of peak reduction
   is probably underestimated (DATA-7).
@@ -100,7 +118,7 @@ HiGHS solver, are installed by `uv sync`.
 
 ```bash
 uv sync
-uv run main.py   # no battery, RBC, LP (A and B) → costs + plots (~40 s)
+uv run main.py   # no battery, RBC, LP + degradation sensitivity → costs + plots (~60 s)
 uv run pytest
 ```
 
@@ -110,8 +128,6 @@ The key open question: how much of the €8,264 remains without perfect knowledg
 
 - **Rolling-horizon optimization:** optimize daily over 24–48 hours using forecasts.
 - **Sensitivity to noise:** savings under increasing errors in price, PV and consumption forecasts.
-- **Degradation cost:** a cost per kWh of throughput in the objective, to see how many cycles
-  and how much of the savings remain once wear is priced in.
 - **GTV and congestion:** the value of a smaller grid connection.
 - **More years:** other price years, RBC threshold out-of-sample.
 - **Real building data:** replace the averaged standard profile with the measured consumption of a
@@ -119,4 +135,4 @@ The key open question: how much of the €8,264 remains without perfect knowledg
 
 ## How this project was built
 
-The problem definition, the reference case, the choice of RBC vs. LP, scenario B and the interpretation of the results are my own. I used Claude Code as a programming assistant for part of the implementation, tests and documentation. I have checked every modeling choice and assumption (see ASSUMPTIONS.md) myself and can justify them.
+The problem definition, the reference case, the choice of RBC vs. LP, the degradation sensitivity and the interpretation of the results are my own. I used Claude Code as a programming assistant for part of the implementation, tests and documentation. I have checked every modeling choice and assumption (see ASSUMPTIONS.md) myself and can justify them.
