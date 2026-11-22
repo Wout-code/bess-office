@@ -112,6 +112,15 @@ def test_lp_charges_cheap_discharges_expensive(result):
     assert (result.loc[cheap, "discharge_kwh"] <= TOL).all()
 
 
+def test_lp_no_simultaneous_charge_discharge_at_positive_prices(result):
+    # BAT-8: simultaneous charging/discharging is not excluded in the LP, but
+    # at positive prices wasting energy through charging losses costs money,
+    # so the solver should never choose it.
+    assert (_prices() > 0).all()  # precondition of this test
+    both = (result["charge_kwh"] > TOL) & (result["discharge_kwh"] > TOL)
+    assert not both.any(), result.loc[both, ["charge_kwh", "discharge_kwh"]]
+
+
 def test_lp_zero_battery_matches_no_battery():
     pv, load = _pv(), _load()
     empty = BatteryConfig(capacity_kwh=0.0, power_kw=0.0)
