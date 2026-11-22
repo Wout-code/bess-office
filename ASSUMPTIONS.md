@@ -8,8 +8,7 @@ applies to.
 ID scheme: every assumption has a unique ID per category: `DATA-n` (input data),
 `BAT-n` (battery), `TIME-n` (time/foresight), `NET-n` (market and grid) and
 `ARCH-n` (model architecture). Numbers are never reused: a new assumption gets
-the next free number in its category. When an assumption is corrected, the
-correction gets a new ID that refers back to the old one.
+the next free number in its category.
 
 This file shows only what currently applies. Replaced assumptions are removed,
 so gaps in the numbering (such as DATA-3, DATA-4, NET-1, NET-6, ARCH-2,
@@ -243,19 +242,24 @@ Both models are costed with the same formula (`compute_financial_metrics` in
   Inherent to a rule, not something to be fixed.
 - **ARCH-1** — No prices in the model: a physical energy-flow simulation; the
   costs are calculated afterwards in `main.py`.
-- **ARCH-3** — Grid charging allowed, corrects ARCH-2. Rule: as long as import
-  stays below the threshold, charge from the grid with at most the remaining
-  headroom up to the threshold, limited by power (minus what is already charged
-  from PV) and max SoC. Side effect: self-consumption drops, because the
-  battery is more often full when PV surplus arrives. At the base-case
-  threshold (2023, 72 kW) grid charging keeps it full whenever PV surplus
-  arrives, so it stores no PV at all: self-consumption 78.3% with grid
-  charging (the same as without battery) vs. 79.2% without. Without grid
-  charging the RBC no longer holds 72 kW (annual peak 96.5 kW),
-  at almost the same net cost (€64,153 vs. €64,163 with grid charging, both
-  including wear). Peak shaving and self-consumption compete for the same SoC,
-  and the threshold makes that trade-off implicitly. In the LP, grid charging
-  is free: the solver decides.
+- **ARCH-3** — Grid charging allowed. Rule: as long as import stays below the
+  threshold, charge from the grid with at most the remaining headroom up to the
+  threshold, limited by power (minus what is already charged from PV) and max
+  SoC.
+  - Effect at the base-case threshold (2023, 72 kW): grid charging keeps the
+    battery full for the next peak, so the RBC holds 72 kW in every month
+    (annual peak 96.5 → 72 kW). The cost is that the full battery has no room
+    for PV surplus: self-consumption stays at 78.3%, the same as without a
+    battery.
+  - Without grid charging the RBC stores some PV (self-consumption 79.2%) but no
+    longer holds the threshold (annual peak 96.5 kW). The net cost is almost
+    the same (€64,153 vs. €64,163 with grid charging, both including wear), but
+    the lower annual peak with grid charging would also allow a smaller
+    contracted capacity, which is not modeled (NET-8). With that included,
+    grid charging would come out clearly ahead.
+  - Peak shaving and self-consumption compete for the same SoC, and the
+    threshold makes that trade-off implicitly. In the LP, grid charging is
+    free: the solver decides.
 
 ---
 
