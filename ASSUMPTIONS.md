@@ -204,7 +204,8 @@ Both models are costed with the same formula (`compute_financial_metrics` in
   refunded on export. In reality, large consumers are usually paid below the
   day-ahead price for feed-in (supplier deduction, no net metering). This
   overvalues export, and therefore larger PV systems (DATA-10) and any battery
-  arbitrage via export. A correction needs a real feed-in contract figure.
+  arbitrage via export. A correction needs the actual feed-in price in a supplier contract,
+  which is not available for me. 
 
 ---
 
