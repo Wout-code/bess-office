@@ -13,10 +13,10 @@ GRID = "#e4e3df"
 
 # (key in compute_financial_metrics, label, colour). Order = stacking order.
 COST_COMPONENTS = [
-    ("import_cost_eur", "Energy (day-ahead)", "#2a78d6"),
+    ("import_cost_eur", "Electricity bought (day-ahead)", "#2a78d6"),
     ("energy_tax_cost_eur", "Energy tax", "#eb6834"),
-    ("transport_cost_eur", "Transport", "#1baf7a"),
-    ("peak_cost_eur", "Monthly peak", "#eda100"),
+    ("transport_cost_eur", "Transport tariff", "#1baf7a"),
+    ("peak_cost_eur", "Monthly peak tariff", "#eda100"),
     ("degradation_cost_eur", "Battery wear", "#008300"),  # BAT-10; slot 6 (slot 5 is export)
 ]
 EXPORT_COMPONENT = ("export_revenue_eur", "Export revenue (subtracted)", "#e87ba4")
@@ -24,10 +24,10 @@ EXPORT_COMPONENT = ("export_revenue_eur", "Export revenue (subtracted)", "#e87ba
 # (key, label) per component for the savings chart, in display order. Export is
 # a revenue, so its saving has the opposite sign of the cost components.
 SAVINGS_COMPONENTS = [
-    ("import_cost_eur", "Energy\n(day-ahead)"),
+    ("import_cost_eur", "Electricity\nbought"),
     ("energy_tax_cost_eur", "Energy tax"),
-    ("transport_cost_eur", "Transport"),
-    ("peak_cost_eur", "Monthly peak"),
+    ("transport_cost_eur", "Transport\ntariff"),
+    ("peak_cost_eur", "Monthly\npeak tariff"),
     ("degradation_cost_eur", "Battery\nwear"),  # no battery = 0, so always a negative saving
     ("export_revenue_eur", "Export\nrevenue"),
 ]
@@ -37,6 +37,14 @@ SCENARIO_COLOURS = ["#8e8c86", "#2a78d6"]  # first scenario grey, second blue
 def _eur(value: float, _pos=None) -> str:
     sign = "−" if value < 0 else ""
     return f"{sign}€{abs(value) / 1000:.0f}k"
+
+
+def _bar_label(value: float) -> str:
+    """Value label for a bar: in thousands, or in whole euros below €100."""
+    sign = "−" if value < 0 else ""
+    if abs(value) < 100:
+        return f"{sign}€{abs(value):.0f}"
+    return f"{sign}€{abs(value) / 1000:.1f}k"
 
 
 def _style_axes(ax) -> None:
@@ -51,9 +59,10 @@ def _style_axes(ax) -> None:
         ax.spines[side].set_visible(False)
 
 
-def _save(fig, path: Path, show: bool) -> Path:
+def _save(fig, path: Path, show: bool, layout: bool = True) -> Path:
     """Save the figure; keep it open only if main.py will show it."""
-    fig.tight_layout()
+    if layout:
+        fig.tight_layout()
     fig.savefig(path, dpi=150, facecolor=SURFACE)
     if not show:
         plt.close(fig)
@@ -123,7 +132,7 @@ def plot_cost_breakdown(financials: dict[str, dict], path: Path, show: bool = Tr
 
     ax.set_ylabel("EUR per year", color=TEXT_SECONDARY)
     ax.set_title(
-        "Annual cost per component, including battery wear\n(2023 prices and PV, 2026 tariffs)",
+        "Annual cost per component, base case\n(incl. battery wear; 2023 prices and PV, 2026 tariffs)",
         color=TEXT_PRIMARY,
         loc="left",
         fontsize=12,
@@ -196,7 +205,7 @@ def plot_savings_breakdown(
         )
         for bar, value in zip(bars, savings):
             ax.annotate(
-                f"{'−' if value < 0 else ''}€{abs(value) / 1000:.1f}k",
+                _bar_label(value),
                 xy=(bar.get_x() + bar.get_width() / 2, value),
                 xytext=(0, 4 if value >= 0 else -4),
                 textcoords="offset points",
@@ -209,13 +218,26 @@ def plot_savings_breakdown(
     _style_axes(ax)
     ax.set_xticks(list(x), [lbl for _, lbl in SAVINGS_COMPONENTS], color=TEXT_PRIMARY)
 
-    ax.set_ylabel("Saving vs. no battery, EUR per year", color=TEXT_SECONDARY)
+    ax.set_ylabel("Change vs. no battery, EUR per year\n(+ saving, − extra cost or lost revenue)",
+                  color=TEXT_SECONDARY)
     ax.set_title(
-        "Where the savings come from, including battery wear\n(2023 prices and PV, 2026 tariffs)",
+        "Where the savings come from, base case\n(battery wear counted as a cost; 2023 prices and PV, 2026 tariffs)",
         color=TEXT_PRIMARY,
         loc="left",
         fontsize=12,
     )
     ax.legend(frameon=False, loc="upper right", labelcolor=TEXT_PRIMARY)
 
-    return _save(fig, path, show)
+    # Short explanation of the two components that are easy to misread.
+    fig.text(
+        0.01,
+        0.01,
+        "Electricity bought: lower cost of electricity bought from the grid (cheaper hours, own PV stored).\n"
+        "Export revenue: less income from feed-in, because PV is stored and used instead of sold.",
+        fontsize=8,
+        color=TEXT_SECONDARY,
+        ha="left",
+        va="bottom",
+    )
+    fig.tight_layout(rect=(0, 0.07, 1, 1))  # leave room for the explanation
+    return _save(fig, path, show, layout=False)
