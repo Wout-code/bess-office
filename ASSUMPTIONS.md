@@ -213,7 +213,7 @@ Both models are costed with the same formula (`compute_financial_metrics` in
 
 - **TIME-1** — No look-ahead: purely reactive, each quarter-hour on its own.
   Inherent to a rule, not something to be fixed.
-- **ARCH-1** — No prices in the model: a physical energy-flow simu  lation; the
+- **ARCH-1** — No prices in the model: a physical energy-flow simulation; the
   costs are calculated afterwards in `main.py`.
 - **ARCH-3** — Grid charging allowed, corrects ARCH-2. Rule: as long as import
   stays below the threshold, charge from the grid with at most the remaining
@@ -248,10 +248,10 @@ Both models are costed with the same formula (`compute_financial_metrics` in
     Scenario B: 16 quarter-hours, also all at a negative price (checked with
     scripts/check_bat8.py).
   - The effect is small and reported, so the model stays an LP.
-- *-9** — End SoC ≥ initial SoC at the end of the year. Without this, the
+- **BAT-9** — End SoC ≥ initial SoC at the end of the year. Without this, the
   LP drains the battery for free at the end and counts that energy as savings.
   The RBC has no such condition (2023: ends at 208.8 kWh vs. 120.5 kWh at the
-  start, a small disadvantage for the RBC).*BAT
+  start, a small disadvantage for the RBC).
 
 ---
 

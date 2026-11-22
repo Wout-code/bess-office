@@ -64,9 +64,8 @@ def run_lp_dispatch(
     prices_eur_mwh : pd.Series
         Day-ahead prices, same index as pv_kwh/load_kwh.
     battery : BatteryConfig
-        Same battery model as dispatch_sim.py. Note: asymmetric charge/discharge
-        power (BAT-7, see ASSUMPTIONS.md) is not yet split into separate
-        limits here -- power_kw is still used for both directions.
+        Same battery model as dispatch_sim.py. power_kw is used for both
+        charging and discharging (BAT-1, see ASSUMPTIONS.md).
     grid_tariff : GridTariffConfig
         Components used here (see config.py docstring for the full
         picture and what is deliberately left out):
