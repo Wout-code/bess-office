@@ -1,7 +1,7 @@
 """Tests for the LP dispatch (optimize.py).
 
 Deliberately run with timestep_hours=0.25: with hourly data kWh == kW and
-unit errors stay invisible (see CLAUDE.md, Units).
+unit errors stay invisible.
 """
 
 import dataclasses
