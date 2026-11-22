@@ -60,7 +60,12 @@ def _prices() -> pd.Series:
 
 @pytest.fixture(scope="module")
 def battery() -> BatteryConfig:
-    return BatteryConfig(capacity_kwh=100.0, power_kw=20.0)  # 5 kWh per quarter-hour
+    # 5 kWh per quarter-hour. Degradation cost pinned to 0, not the config's
+    # base case: these tests check physics and price response, and at 0 only
+    # the charging loss stands against needless cycling, so the price-response
+    # and BAT-8 tests are at their strictest. Wear pricing (BAT-10) has its own
+    # test below.
+    return BatteryConfig(capacity_kwh=100.0, power_kw=20.0, degradation_cost_eur_per_kwh=0.0)
 
 
 @pytest.fixture(scope="module")
@@ -124,6 +129,8 @@ def test_lp_no_simultaneous_charge_discharge_at_positive_prices(result):
 
 def test_lp_zero_battery_matches_no_battery():
     pv, load = _pv(), _load()
+    # Default degradation cost is fine here: without capacity nothing is
+    # discharged, so the wear cost cannot affect the result.
     empty = BatteryConfig(capacity_kwh=0.0, power_kw=0.0)
 
     result = run_lp_dispatch(pv, load, _prices(), empty, GridTariffConfig(), timestep_hours=DT)
@@ -139,7 +146,8 @@ def test_lp_zero_battery_matches_no_battery():
 def test_lp_higher_degradation_cost_cycles_less(battery):
     # BAT-10: a cost per kWh discharged can only make cycling less attractive,
     # so a higher degradation cost never leads to more discharge.
-    free = run_lp_dispatch(_pv(), _load(), _prices(), battery, GridTariffConfig(), timestep_hours=DT)
+    free_battery = dataclasses.replace(battery, degradation_cost_eur_per_kwh=0.0)
+    free = run_lp_dispatch(_pv(), _load(), _prices(), free_battery, GridTariffConfig(), timestep_hours=DT)
     # 0.10 EUR/kWh is a synthetic test value, chosen high enough to change the
     # dispatch on this day (lower values leave it unchanged: the spread is wide).
     costly_battery = dataclasses.replace(battery, degradation_cost_eur_per_kwh=0.10)

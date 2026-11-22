@@ -121,14 +121,13 @@ Both models use the same battery model.
 - **BAT-2** — Losses only on charging: the full round-trip efficiency is
   applied when charging, discharging is lossless.
 - **BAT-3** — No physical degradation: capacity and efficiency stay constant
-  over the year. By default battery wear has no cost (charging losses and grid
-  costs of cycling are included); a cost per kWh discharged is included as a
-  sensitivity (BAT-10).
-  - Why it matters: without a wear cost the LP cycles far more than the RBC
-    (equivalent full cycles per year, 2023: RBC 102, LP 486), so free wear
-    favours the LP. Its savings are optimistic on this count as well as on
-    perfect foresight (TIME-2). With a degradation cost of €0.04/kWh the LP
-    drops to 268 cycles (BAT-10).
+  over the year. Wear is instead priced as a cost per kWh discharged, €0.04 in
+  the base case (BAT-10), on top of the charging losses and grid costs of
+  cycling.
+  - Why it matters: the LP cycles far more than the RBC (equivalent full
+    cycles per year, 2023, base case: RBC 32, LP 268). With free wear the gap
+    is RBC 102, LP 486, and the LP savings would be optimistic on this count as
+    well as on perfect foresight (TIME-2).
   - What drives wear here: at low C-rates (this system: 99 kW / 241 kWh ≈
     0.41C), ageing is driven mainly by time, temperature and energy throughput,
     and hardly by depth of discharge (Wang et al., 2011, on LFP cells). The
@@ -136,9 +135,10 @@ Both models use the same battery model.
     depth-of-discharge cost.
   - Open question: how large that cost should be depends on how calendar and
     cycle ageing combine. If the battery is replaced at the end of its calendar
-    life anyway, extra cycles cost little: 486 cycles per year still reaches
-    ≥ 6,000 cycles (DATA-9) only after ~12 years. If both add up, every cycle
-    shortens the battery's life and the cost per kWh is substantial.
+    life anyway, extra cycles cost little: even the free-wear LP (486 cycles
+    per year) reaches ≥ 6,000 cycles (DATA-9) only after ~12 years, the
+    base-case LP (268) after ~22 years. If both add up, every cycle shortens
+    the battery's life and the cost per kWh is substantial.
   - This is why BAT-10 uses a cost per kWh of throughput and runs it as a
     range rather than a single value.
 - **BAT-4** — No minimum on/off time: the battery can switch every
@@ -146,12 +146,12 @@ Both models use the same battery model.
 - **BAT-5** — Efficiency and capacity are constant, regardless of SoC, charging
   rate or temperature.
 - **BAT-6** — No self-discharge.
-- **BAT-10** — Degradation cost per kWh discharged, as a sensitivity analysis.
-  `degradation_cost_eur_per_kwh` (default 0.0) is charged on every kWh
+- **BAT-10** — Degradation cost per kWh discharged, €0.04 in the base case.
+  `degradation_cost_eur_per_kwh` (default 0.04) is charged on every kWh
   discharged, both in the LP objective and in `compute_financial_metrics`, so
-  RBC and LP are costed with the same formula. `main.py` runs it for 0, 0.02,
-  0.04 and 0.06 EUR/kWh.
-  - Central value: replaceable battery hardware / (cycle life × usable kWh
+  RBC and LP are costed with the same formula. `main.py` also runs a
+  sensitivity for 0, 0.02, 0.04 and 0.06 EUR/kWh.
+  - Base case: replaceable battery hardware / (cycle life × usable kWh
     per cycle). Hardware ~€200/kWh (pv Europe / sun.store battery price index,
     Aug 2026: €190–209/kWh for commercial systems, hardware only, excl.
     installation), so 241 kWh × €200 = ~€48,200; cycle life ≥ 6,000 (DATA-9);
@@ -159,20 +159,21 @@ Both models use the same battery model.
     €48,200 / (6,000 × 204.85) = ~€0.039, rounded to €0.04/kWh.
   - Hardware only: installation, grid studies and civil works do not wear with
     cycling, so they are excluded here; they belong in the payback calculation.
-  - Why a range: the central value attributes all wear to cycling, which is an
+  - Why a range: the base case attributes all wear to cycling, which is an
     upper bound if calendar ageing dominates (BAT-3). The range therefore runs:
-    - 0: wear is free (calendar ageing dominates);
-    - €0.04/kWh: central value;
-    - €0.06/kWh: stress case above the central value, e.g. a shorter cycle
+    - 0: wear is free (calendar ageing dominates), the upper bound on the
+      savings;
+    - €0.04/kWh: base case;
+    - €0.06/kWh: stress case above the base case, e.g. a shorter cycle
       life of 4,000 instead of 6,000 cycles:
       €48,200 / (4,000 × 204.85) = ~€0.059.
-  - The LP is re-solved for every value. The RBC dispatch is price-agnostic
-    (ARCH-1) and stays the same, including its 52 kW threshold (NET-4), which
-    is chosen without degradation cost; only its costs are recalculated. With
-    a degradation cost a different threshold might be cheaper, so the RBC
-    results above 0 are slightly pessimistic.
-  - Result (2023), savings vs. no battery: RBC €1,066 / €646 / €226 / −€194,
-    LP €8,264 / €6,571 / €5,304 / €4,313; LP cycles per year
+  - The LP is re-solved for every value. The RBC rule itself is
+    price-agnostic (ARCH-1), but its threshold is chosen on net cost including
+    wear (NET-4), so the threshold is re-chosen for every value and the RBC is
+    re-run at that threshold.
+  - Result (2023) for 0 / 0.02 / 0.04 / 0.06 EUR/kWh: RBC threshold
+    52 / 52 / 72 / 72 kW; savings vs. no battery RBC €1,066 / €646 / €461 /
+    €330, LP €8,264 / €6,571 / €5,304 / €4,313; LP cycles per year
     486 / 358 / 268 / 218.
 
 ---
@@ -190,9 +191,10 @@ Both models are costed with the same formula (`compute_financial_metrics` in
     the lowest achievable peak for each month.
   - RBC: one discharge threshold for the whole year. It is chosen by running
     the RBC for every threshold from 50 to 98 kW (steps of 2 kW,
-    `select_rbc_threshold`) and keeping the one with the lowest annual net cost
-    (2023: 52 kW). The rule itself never looks at prices (ARCH-1); only this
-    choice does.
+    `select_rbc_threshold`) and keeping the one with the lowest annual net cost,
+    including battery wear (2023, base case: 72 kW; 52 kW with free wear, see
+    BAT-10). The rule itself never looks at prices (ARCH-1); only this choice
+    does.
   - The threshold is chosen on the same year it is tested on (in-sample), with
     hindsight a real controller would not have. This favours the RBC slightly.
 - **NET-5** — Energy tax (energiebelasting) at a fixed rate per imported kWh:
@@ -209,7 +211,7 @@ Both models are costed with the same formula (`compute_financial_metrics` in
   of a dynamic versus a fixed contract on the full building load, which is part
   of the owner's decision but not of the battery's value, and (c) batteries
   installed only for peak shaving or congestion behind a fixed-price contract:
-  there the ~€6,600 arbitrage component of the LP savings does not apply.
+  there the ~€5,300 arbitrage component of the LP savings does not apply.
 - **NET-8** — Grid tariffs: Liander 2026, sub-market MS/LS > 50 up to and
   including 136 kW, verified against the tariff sheet: transport €0.0226/kWh,
   monthly peak €3.57/kW/month, contracted capacity (GTV) €3.74/kW/month. This
@@ -239,12 +241,15 @@ Both models are costed with the same formula (`compute_financial_metrics` in
 - **ARCH-3** — Grid charging allowed, corrects ARCH-2. Rule: as long as import
   stays below the threshold, charge from the grid with at most the remaining
   headroom up to the threshold, limited by power (minus what is already charged
-  from PV) and max SoC. Side effect: self-consumption drops (2023, threshold
-  52 kW: 83.1% without vs. 78.6% with grid charging; 78.3% without battery),
-  because the battery is more often full when PV surplus arrives. Peak shaving
-  and self-consumption compete for the same SoC, and the threshold makes that
-  trade-off implicitly. At the same threshold, the RBC with grid charging is
-  also slightly more expensive (€63,558 vs. €63,300). In the LP, grid charging
+  from PV) and max SoC. Side effect: self-consumption drops, because the
+  battery is more often full when PV surplus arrives. At the base-case
+  threshold (2023, 72 kW) grid charging keeps it full whenever PV surplus
+  arrives, so it stores no PV at all: self-consumption 78.3% with grid
+  charging (the same as without battery) vs. 79.2% without. Without grid
+  charging the RBC no longer holds 72 kW (annual peak 96.5 kW),
+  at almost the same net cost (€64,153 vs. €64,163 with grid charging, both
+  including wear). Peak shaving and self-consumption compete for the same SoC,
+  and the threshold makes that trade-off implicitly. In the LP, grid charging
   is free: the solver decides.
 
 ---
@@ -263,17 +268,18 @@ Both models are costed with the same formula (`compute_financial_metrics` in
   - Why it happens: at negative prices, wasting energy through charging losses
     earns money, so charging and discharging at the same time is optimal for
     the LP.
-  - Checked (2023 data), without degradation cost: 398 of 35,032
-    quarter-hours, all at a negative price (1,256 quarter-hours < 0). 546 kWh
-    is lost, at most ~€270/year even at the lowest price (−500 EUR/MWh): ~3% of
-    the LP savings. With a degradation cost of €0.04/kWh (BAT-10): 16
-    quarter-hours, also all at a negative price, 15 kWh lost, at most ~€8/year
-    (checked with scripts/check_bat8.py).
+  - Checked (2023 data, scripts/check_bat8.py), base case (€0.04/kWh,
+    BAT-10): 16 of 35,032 quarter-hours, all at a negative price
+    (1,256 quarter-hours < 0). 15 kWh is lost, at most ~€8/year even at the
+    lowest price (−500 EUR/MWh): ~0.1% of the LP savings. With free wear
+    (BAT-10, 0): 398 quarter-hours, also all at a
+    negative price, 546 kWh lost, at most ~€270/year (~3% of the LP savings
+    at that value).
   - The effect is small and reported, so the model stays an LP.
 - **BAT-9** — End SoC ≥ initial SoC at the end of the year. Without this, the
   LP drains the battery for free at the end and counts that energy as savings.
-  The RBC has no such condition (2023: ends at 208.8 kWh vs. 120.5 kWh at the
-  start, a small disadvantage for the RBC).
+  The RBC has no such condition (2023, base case: ends at 228.9 kWh vs.
+  120.5 kWh at the start, a small disadvantage for the RBC).
 
 ---
 

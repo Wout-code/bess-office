@@ -13,13 +13,13 @@ class BatteryConfig:
     max_soc_fraction: float = 0.95       # not in datasheet, typical LFP value (DATA-9)
     initial_soc_fraction: float = 0.50
     # Degradation cost per kWh DISCHARGED (BAT-10), in the LP objective and in
-    # main.compute_financial_metrics. 0.0 = wear is free (BAT-3). Central value
-    # 0.04 = replaceable hardware ~200 EUR/kWh x 241 kWh (~48,200 EUR) /
-    # (6,000 cycles x 204.85 usable kWh per cycle) = ~0.039 EUR/kWh.
-    degradation_cost_eur_per_kwh: float = 0.0
+    # main.compute_financial_metrics. Base case 0.04 = replaceable hardware
+    # ~200 EUR/kWh x 241 kWh (~48,200 EUR) / (6,000 cycles x 204.85 usable kWh
+    # per cycle) = ~0.039 EUR/kWh.
+    degradation_cost_eur_per_kwh: float = 0.04
     # Values main.py runs the degradation-cost sensitivity for (BAT-10):
-    # 0 = wear is free (calendar ageing dominates), 0.04 = central value,
-    # 0.06 = stress case, e.g. 4,000 instead of 6,000 cycles:
+    # 0 = wear is free (calendar ageing dominates; upper bound on the savings),
+    # 0.04 = base case, 0.06 = stress case, e.g. 4,000 instead of 6,000 cycles:
     # 48,200 / (4,000 x 204.85) = ~0.059 EUR/kWh.
     degradation_cost_sensitivity_eur_per_kwh: tuple[float, ...] = (0.0, 0.02, 0.04, 0.06)
 

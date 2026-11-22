@@ -7,9 +7,9 @@ reference building) and day-ahead prices (ENTSO-E), align them to quarter-
 hours, run both dispatch methods and translate the results to EUR.
 
 Output: a comparison of no battery, RBC (dispatch_sim.py) and LP (optimize.py)
-on peak reduction and euros without degradation cost, a sensitivity analysis
-over the degradation cost per kWh discharged (BAT-10), and cost and savings
-breakdown plots. Run with `uv run main.py`.
+on peak reduction and euros at the base-case degradation cost (BAT-10), a
+sensitivity analysis over the degradation cost per kWh discharged, and cost
+and savings breakdown plots. Run with `uv run main.py`.
 """
 
 import dataclasses
@@ -47,8 +47,7 @@ def compute_financial_metrics(
     - import cost and export revenue at the day-ahead price (NET-7, NET-9),
     - transport tariff per kWh imported,
     - energy tax per kWh imported, no netting (NET-5),
-    - degradation cost per kWh discharged from the battery (BAT-10, 0 by
-      default),
+    - degradation cost per kWh discharged from the battery (BAT-10),
     - monthly peak tariff per kW of the highest quarter-hour import per
       calendar month (NET-4).
 
@@ -102,8 +101,10 @@ def select_rbc_threshold(
     plus the net cost per scanned threshold (NET-4).
 
     Prices stay out of dispatch_sim.py (ARCH-1): the rule itself never looks at
-    prices, only the choice of threshold does. The choice is made on the same
-    year it is tested on (in-sample), which favours the RBC.
+    prices, only the choice of threshold does. The net cost includes battery
+    wear, so the chosen threshold depends on battery.degradation_cost_eur_per_kwh
+    (BAT-10). The choice is made on the same year it is tested on (in-sample),
+    which favours the RBC.
     """
     cfg = CONFIG.dispatch
     thresholds_kw = np.arange(
@@ -273,33 +274,43 @@ def main() -> None:
     print()
 
     # --- Sensitivity: degradation cost per kWh discharged (BAT-10) ---
-    # The RBC never looks at prices or costs (ARCH-1), so its dispatch (and its
-    # 52 kW threshold, chosen without degradation cost) stays the same; only its
-    # costs are recalculated. The LP is re-solved for every value. The no-battery
+    # The RBC rule never looks at prices or costs (ARCH-1), but its threshold is
+    # chosen on net cost including wear, so the threshold is re-chosen for every
+    # value and the RBC re-run at that threshold. The LP is re-solved for every
+    # value. The base-case value reuses the results from above. The no-battery
     # reference discharges nothing, so its cost is the same for every value.
     print("=== Sensitivity: degradation cost per kWh discharged (BAT-10) ===")
     print(f"Net cost no battery: €{no_battery_financials['net_cost_eur']:.2f} (independent of degradation cost)")
     print(
-        f"{'EUR/kWh':>8}{'Net cost RBC':>14}{'Savings RBC':>13}"
+        f"{'EUR/kWh':>8}{'RBC thr. kW':>13}{'Net cost RBC':>14}{'Savings RBC':>13}"
         f"{'Net cost LP':>14}{'Savings LP':>12}{'Cycles/yr LP':>14}"
     )
     for degradation_cost in CONFIG.battery.degradation_cost_sensitivity_eur_per_kwh:
         battery_d = dataclasses.replace(CONFIG.battery, degradation_cost_eur_per_kwh=degradation_cost)
-        rbc_financials_d = compute_financial_metrics(
-            rbc_result, prices_quarter, CONFIG.grid_tariff, battery_d, CONFIG.sim.timestep_hours
-        )
         if degradation_cost == CONFIG.battery.degradation_cost_eur_per_kwh:
-            lp_result_d = lp_result  # already solved above with this value
+            # already run above with this value
+            rbc_threshold_kw_d, rbc_result_d, lp_result_d = rbc_threshold_kw, rbc_result, lp_result
         else:
+            rbc_threshold_kw_d, _ = select_rbc_threshold(
+                pv_quarter, load, prices_quarter, battery_d, CONFIG.grid_tariff, CONFIG.sim.timestep_hours
+            )
+            rbc_result_d = run_baseline_dispatch(
+                pv_quarter, load, battery_d, peak_threshold_kw=rbc_threshold_kw_d,
+                timestep_hours=CONFIG.sim.timestep_hours,
+            )
             lp_result_d = run_lp_dispatch(
                 pv_quarter, load, prices_quarter, battery_d, CONFIG.grid_tariff,
                 timestep_hours=CONFIG.sim.timestep_hours,
             )
+        rbc_financials_d = compute_financial_metrics(
+            rbc_result_d, prices_quarter, CONFIG.grid_tariff, battery_d, CONFIG.sim.timestep_hours
+        )
         lp_financials_d = compute_financial_metrics(
             lp_result_d, prices_quarter, CONFIG.grid_tariff, battery_d, CONFIG.sim.timestep_hours
         )
         print(
             f"{degradation_cost:>8.2f}"
+            f"{rbc_threshold_kw_d:>13.0f}"
             f"{rbc_financials_d['net_cost_eur']:>14.2f}"
             f"{no_battery_financials['net_cost_eur'] - rbc_financials_d['net_cost_eur']:>13.2f}"
             f"{lp_financials_d['net_cost_eur']:>14.2f}"
@@ -308,7 +319,7 @@ def main() -> None:
         )
     print()
 
-    # --- Plots: cost per component and savings per component, no degradation cost ---
+    # --- Plots: cost per component and savings per component, base case incl. battery wear (BAT-10) ---
     plot_path = plot_cost_breakdown(
         {
             "No battery": no_battery_financials,

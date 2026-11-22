@@ -1,5 +1,5 @@
 """BAT-8 check: quarter-hours with simultaneous charge and discharge, per solver
-and degradation cost (0 and the central value 0.04 EUR/kWh, BAT-10). Data prep
+and degradation cost (the base case from config and 0 = free wear, BAT-10). Data prep
 copied from main.main() (not importable separately).
 
 Usage: uv run python scripts/check_bat8.py [solver ...]   (default: appsi_highs)
@@ -36,7 +36,8 @@ prices = get_day_ahead_prices(
 pv, load = pv.align(load, join="inner")
 prices = prices.reindex(load.index, method="ffill")
 
-DEGRADATION_COSTS_EUR_PER_KWH = (0.0, 0.04)  # without wear cost, central value (BAT-10)
+# base case, then free wear as the upper bound (BAT-10)
+DEGRADATION_COSTS_EUR_PER_KWH = (CONFIG.battery.degradation_cost_eur_per_kwh, 0.0)
 eta = CONFIG.battery.round_trip_efficiency
 usable = (CONFIG.battery.max_soc_fraction - CONFIG.battery.min_soc_fraction) * CONFIG.battery.capacity_kwh
 

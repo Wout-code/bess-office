@@ -17,6 +17,7 @@ COST_COMPONENTS = [
     ("energy_tax_cost_eur", "Energy tax", "#eb6834"),
     ("transport_cost_eur", "Transport", "#1baf7a"),
     ("peak_cost_eur", "Monthly peak", "#eda100"),
+    ("degradation_cost_eur", "Battery wear", "#008300"),  # BAT-10; slot 6 (slot 5 is export)
 ]
 EXPORT_COMPONENT = ("export_revenue_eur", "Export revenue (subtracted)", "#e87ba4")
 
@@ -27,6 +28,7 @@ SAVINGS_COMPONENTS = [
     ("energy_tax_cost_eur", "Energy tax"),
     ("transport_cost_eur", "Transport"),
     ("peak_cost_eur", "Monthly peak"),
+    ("degradation_cost_eur", "Battery\nwear"),  # no battery = 0, so always a negative saving
     ("export_revenue_eur", "Export\nrevenue"),
 ]
 SCENARIO_COLOURS = ["#8e8c86", "#2a78d6"]  # first scenario grey, second blue
@@ -121,7 +123,7 @@ def plot_cost_breakdown(financials: dict[str, dict], path: Path, show: bool = Tr
 
     ax.set_ylabel("EUR per year", color=TEXT_SECONDARY)
     ax.set_title(
-        "Annual cost per component, no degradation cost\n(2023 prices and PV, 2026 tariffs)",
+        "Annual cost per component, including battery wear\n(2023 prices and PV, 2026 tariffs)",
         color=TEXT_PRIMARY,
         loc="left",
         fontsize=12,
@@ -209,7 +211,7 @@ def plot_savings_breakdown(
 
     ax.set_ylabel("Saving vs. no battery, EUR per year", color=TEXT_SECONDARY)
     ax.set_title(
-        "Where the savings come from, no degradation cost\n(2023 prices and PV, 2026 tariffs)",
+        "Where the savings come from, including battery wear\n(2023 prices and PV, 2026 tariffs)",
         color=TEXT_PRIMARY,
         loc="left",
         fontsize=12,
